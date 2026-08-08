@@ -22,32 +22,41 @@ Plus the Pareto frontier over (rent, avgMinutes) — the full solution set for a
 - Single pin, straight-line km, λ slider, linked Leaflet map + SVG scatter,
   Pareto frontier, argmin tile, table view, light/dark.
 
-## v2 (current work)
+## v2 (shipped in this repo)
 
-- **Minutes, not km.** Real subway commute times from MTA static GTFS
-  (`scripts/build_subway_graph.py` → `pages/subway-graph.json`):
-  stations, per-route median inter-station run times from weekday schedules,
-  per-route median headways (wait = headway/2), transfer times from transfers.txt,
-  MTA route colors. Client-side Dijkstra on (station × route) nodes.
-- **Walk access/egress** at 1.4 m/s (standard planning value); pure-walk wins when
-  faster. Optional bike mode (15 km/h, labeled estimate).
-- **Multiple destinations**: click-to-add pins, each with name + trips/week weight.
-- **Station layer** (toggle vs neighborhood layer): stations as organic cluster
-  seeds; station rent = inverse-distance-weighted blend of StreetEasy neighborhood
-  medians within the catchment, labeled as derived.
-- **Precise routes**: clicking any candidate draws the actual station-by-station
-  polyline per destination, colored by MTA line color, with a minutes breakdown
-  (walk / wait / ride / transfer).
+Decision (per Andrew Kaplan's advice): build around **Google Maps Platform** instead
+of a GTFS pipeline — transit scheduling, route polylines, geocoding and autocomplete
+come from the API; the free tier is protected by caching. GTFS precompute remains the
+documented key-free alternative (see Research).
+
+- **Minutes, not km.** Distance Matrix API per (candidate, destination, mode);
+  modes transit + walking both fetched, **fastest wins automatically** (no mode
+  picker). Scheduled departure: next Monday 9:00am. 30-day localStorage cache —
+  API is touched only when a pin moves (Andrew: "cache the distances").
+- **No λ slider.** ε-constraint formulation instead: rent cap + commute cap sliders,
+  objective toggle (cheapest rent | shortest commute), exact argmin over the feasible
+  set by enumeration. Pareto frontier always shown; caps drawn as guide lines,
+  infeasible candidates faded.
+- **Multiple destinations**: address dropdown (Places autocomplete with key,
+  OSM Photon without), click-to-add, per-journey trips/week weight, drag pins.
+- **Pasted listings**: address + rent → geocoded, becomes a first-class candidate
+  (diamond mark), auto-selected with routes drawn on add.
+- **Precise routes**: click a candidate → Directions API per destination in the
+  winning mode; transit steps drawn in the line's official color with line pills +
+  per-leg minutes; walking legs dashed.
 - **Live listings**: NO scraping — StreetEasy has no public listings API and its
-  ToS forbids scraping (decision: hold this line). Instead every cluster/neighborhood
-  deep-links to the live StreetEasy search for its area filtered by beds + max price
-  (parameterized URL, slug from neighborhood name).
+  ToS forbids scraping (decision: hold this line). Every neighborhood deep-links to
+  the live StreetEasy search for its area (+ beds filter).
+- **No key → fallback**: Leaflet + CARTO tiles, straight-line km, Photon address
+  search; banner explains how to add a key. `GMAPS_KEY_DEFAULT` in index.html or
+  localStorage.
 
 ## Data sources (verified 2026-08-07)
 
 - StreetEasy: https://cdn-charts.streeteasy.com/rentals/{All,Studio,OneBd,TwoBd,ThreePlusBd}/medianAskingRent_*.zip
   (no CORS — must be build-time; attribute "StreetEasy"; no formal license published)
-- MTA subway GTFS static: https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
+- MTA subway GTFS static (shelved alternative): https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
+- Google Maps Platform: Maps JS, Distance Matrix, Directions, Places, Geocoding (referrer-restricted key)
 - NYC NTA 2020 boundaries (centroids): data.cityofnewyork.us 9nt8-h7nd
 - Better polygon source if needed later: HodgesWardElliott/custom-nyc-neighborhoods (139/176 exact)
 

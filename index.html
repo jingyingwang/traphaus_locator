@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>rent map - jean land</title>
+<title>traphaus locator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏚️</text></svg>" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -46,23 +47,31 @@
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     line-height: 1.45;
   }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 20px 40px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 20px 20px 40px; }
 
   header.top h1 {
     font-family: 'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, serif;
     font-weight: normal; font-size: 1.9rem; margin: 0 0 2px;
   }
-  header.top .sub { color: var(--text-secondary); font-size: 0.95rem; margin: 0 0 4px; }
-  header.top a { color: var(--series-blue); text-decoration: none; }
-  header.top a:hover { text-decoration: underline; }
+  header.top .sub { color: var(--text-secondary); font-size: 0.95rem; margin: 0 0 4px; max-width: 74rem; }
+  a { color: var(--series-blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
 
-  /* one filter row above everything it scopes */
+  .banner {
+    background: var(--surface-1); border: 1px solid var(--winner); border-radius: 10px;
+    padding: 10px 14px; margin: 12px 0; font-size: 0.88rem;
+  }
+  .banner input { width: 340px; max-width: 60vw; padding: 5px 8px; font: inherit;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--page); color: var(--text-primary); }
+  .banner button { font: inherit; padding: 5px 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--series-blue); color: #fff; cursor: pointer; }
+
   .filters {
-    display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center;
+    display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start;
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
     padding: 12px 16px; margin: 14px 0;
   }
-  .filters .flabel { font-size: 0.78rem; color: var(--muted); display: block; margin-bottom: 3px; }
+  .flabel { font-size: 0.78rem; color: var(--muted); display: block; margin-bottom: 3px; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .seg button {
     border: 0; background: transparent; color: var(--text-secondary);
@@ -70,9 +79,37 @@
   }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button[aria-pressed="true"] { background: var(--series-blue); color: #fff; }
-  .lam input[type=range] { width: 220px; accent-color: var(--series-blue); vertical-align: middle; }
-  .lam output { font-variant-numeric: tabular-nums; font-size: 0.9rem; color: var(--text-primary); }
-  .hint { font-size: 0.78rem; color: var(--muted); max-width: 240px; }
+  .lam input[type=range] { width: 200px; accent-color: var(--series-blue); vertical-align: middle; }
+  .lam output { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+
+  /* destinations editor */
+  .dests { min-width: 320px; }
+  .dest-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+  .dest-row .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--winner); flex: none; }
+  .dest-row input.dname { flex: 1 1 auto; min-width: 90px; padding: 4px 7px; font: inherit; font-size: 0.86rem;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--page); color: var(--text-primary); }
+  .dest-row input.dw { width: 52px; padding: 4px 5px; font: inherit; font-size: 0.86rem; text-align: right;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--page); color: var(--text-primary); }
+  .dest-row .wunit { font-size: 0.74rem; color: var(--muted); }
+  .dest-row button.del { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 0 2px; }
+  .dest-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+  .dest-add button, .listing-form button {
+    font: inherit; font-size: 0.82rem; padding: 4px 10px; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--series-blue);
+  }
+  .dest-add button.arm { background: var(--winner); border-color: var(--winner); color: #fff; }
+  .dest-add input, .listing-form input { padding: 4px 7px; font: inherit; font-size: 0.86rem;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--page); color: var(--text-primary); }
+  .dest-search { position: relative; }
+  .ac-list {
+    position: absolute; top: 100%; left: 0; z-index: 1500; min-width: 260px; max-width: 90vw;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.18); overflow: hidden; display: none;
+  }
+  .ac-list.on { display: block; }
+  .ac-item { padding: 6px 10px; font-size: 0.84rem; cursor: pointer; }
+  .ac-item:hover, .ac-item.sel { background: var(--grid); }
+  .ac-item small { color: var(--muted); display: block; }
 
   .tile {
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
@@ -82,6 +119,8 @@
   .tile .v { font-size: 1.45rem; }
   .tile .v.win { color: var(--winner); font-weight: 600; }
   .tile .v small { font-size: 0.85rem; color: var(--text-secondary); }
+  .status { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; min-height: 1.2em; }
+  .busy .panels, .busy .tile { opacity: 0.55; transition: opacity 0.2s; }
 
   .panels { display: flex; gap: 14px; flex-wrap: wrap; }
   .panel {
@@ -90,19 +129,28 @@
   }
   .panel h2 { font-size: 0.95rem; font-weight: 600; margin: 0 0 2px; }
   .panel .note { font-size: 0.78rem; color: var(--muted); margin: 0 0 8px; }
-  #map { height: 470px; border-radius: 6px; }
+  #map { height: 500px; border-radius: 6px; }
   #scatter { width: 100%; height: auto; display: block; }
 
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; font-size: 0.78rem; color: var(--text-secondary); margin-top: 8px; }
   .chip { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .chip.diamond { border-radius: 2px; transform: rotate(45deg); }
   .rampbar { display: inline-flex; height: 10px; border-radius: 3px; overflow: hidden; vertical-align: -1px; margin: 0 5px; }
   .rampbar i { width: 16px; }
+
+  .route-panel { margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; font-size: 0.84rem; display: none; }
+  .route-panel.on { display: block; }
+  .route-panel h3 { font-size: 0.9rem; margin: 0 0 4px; }
+  .route-leg { margin: 4px 0; color: var(--text-secondary); }
+  .route-leg b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .lpill { display: inline-block; min-width: 1.4em; text-align: center; padding: 0 5px; border-radius: 4px;
+    color: #fff; font-size: 0.76rem; font-weight: 600; margin: 0 2px; }
 
   .tooltip {
     position: fixed; pointer-events: none; z-index: 2000; display: none;
     background: var(--surface-1); color: var(--text-primary);
     border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
-    padding: 8px 10px; font-size: 0.82rem; max-width: 240px;
+    padding: 8px 10px; font-size: 0.82rem; max-width: 250px;
   }
   .tooltip .tt-name { font-weight: 600; }
   .tooltip .tt-row { color: var(--text-secondary); }
@@ -129,18 +177,40 @@
 <body class="viz-root">
 <div class="wrap">
   <header class="top">
-    <h1>rent vs. commute</h1>
+    <h1>traphaus locator</h1>
     <p class="sub">
-      the <a href="https://en.wikipedia.org/wiki/Bid_rent_theory">bid-rent curve</a> of new york city.
-      drag the ✕ pin to where you work. each dot is a neighborhood: median asking rent
-      (<a href="https://streeteasy.com/blog/data-dashboard/">StreetEasy</a>) against straight-line
-      distance to your pin. the cheapest-for-its-distance set — the pareto frontier — is blue;
-      the single best neighborhood for your λ is orange.
-      &nbsp;·&nbsp; <a href="/">⌂ back to jean land</a>
+      where should you live in new york? add the places you actually go — office, gym, your people —
+      weighted by trips per week. every neighborhood (or specific listing you paste in) is scored by
+      median asking rent (<a href="https://streeteasy.com/blog/data-dashboard/">StreetEasy</a>) against
+      your trip-weighted door-to-door commute in minutes (fastest of transit or walking, chosen
+      automatically per trip). set a rent cap and a commute cap, pick which one to optimize, and the
+      best candidate lights up orange. blue = the pareto frontier. click any candidate for its exact
+      routes, train lines included.
     </p>
   </header>
 
+  <div class="banner" id="keyBanner" style="display:none">
+    ⚠ running in <b>straight-line fallback</b> (distances, not minutes). paste a
+    <a href="https://developers.google.com/maps/documentation/javascript/get-api-key">Google Maps API key</a>
+    (enable Maps JavaScript, Distance Matrix, Directions, Places, Geocoding; restrict by referrer)
+    to get real transit / walking / cycling minutes and exact routes:
+    <input id="keyInput" type="text" placeholder="AIza…" autocomplete="off" />
+    <button id="keySave">use key</button>
+  </div>
+
   <div class="filters" role="group" aria-label="filters">
+    <div class="dests">
+      <span class="flabel">your journeys — weight = trips per week</span>
+      <div id="destList"></div>
+      <div class="dest-add">
+        <span class="dest-search">
+          <input id="destSearch" name="destSearch" type="text" placeholder="add an address…" size="24"
+                 autocomplete="off" aria-label="search an address to add as a journey" />
+          <div class="ac-list" id="acList"></div>
+        </span>
+        <button id="destClick">or click the map</button>
+      </div>
+    </div>
     <div>
       <span class="flabel">apartment size</span>
       <span class="seg" id="bedSeg">
@@ -150,56 +220,70 @@
         <button data-bd="2br" aria-pressed="false">2 br</button>
         <button data-bd="3br" aria-pressed="false">3+ br</button>
       </span>
+      <span class="flabel" style="margin-top:8px">optimize for</span>
+      <span class="seg" id="objSeg">
+        <button data-obj="rent" aria-pressed="true">cheapest rent</button>
+        <button data-obj="commute" aria-pressed="false">shortest commute</button>
+      </span>
     </div>
     <div class="lam">
-      <span class="flabel">λ — what a km closer is worth to you</span>
-      <input type="range" id="lambda" min="0" max="800" step="10" value="100"
-             aria-label="dollars per month per kilometer" />
-      <output id="lambdaOut">$100 /mo per km</output>
-    </div>
-    <div>
-      <span class="flabel">view</span>
+      <span class="flabel">rent cap ($/mo)</span>
+      <input type="range" id="maxRent" min="1000" max="12000" step="100" value="12000" aria-label="max rent" />
+      <output id="maxRentOut">no cap</output>
+      <span class="flabel" style="margin-top:8px">commute cap (avg <span class="metricUnit">minutes</span>)</span>
+      <input type="range" id="maxT" min="5" max="120" step="5" value="120" aria-label="max commute" />
+      <output id="maxTOut">no cap</output>
+      <span class="flabel" style="margin-top:8px">view</span>
       <span class="seg" id="viewSeg">
         <button data-view="viz" aria-pressed="true">map + chart</button>
         <button data-view="table" aria-pressed="false">table</button>
       </span>
     </div>
-    <div class="hint">minimizing cost(n) = rent(n) + λ·distance(n) over all neighborhoods — exact argmin, no descent required.</div>
+    <div class="listing-form" style="max-width:250px">
+      <span class="flabel">compare a specific listing (paste from StreetEasy)</span>
+      <input id="lAddr" type="text" placeholder="address" size="20" style="margin-bottom:4px" />
+      <input id="lRent" type="number" placeholder="$/mo" size="8" min="0" />
+      <button id="lAdd">add</button>
+      <div class="flabel" id="lNote" style="margin-top:3px"></div>
+    </div>
   </div>
 
   <div class="tile" id="tile">
-    <span><span class="k">optimal neighborhood</span><span class="v win" id="tWin">—</span></span>
-    <span><span class="k">median rent</span><span class="v" id="tRent">—</span></span>
-    <span><span class="k">distance</span><span class="v" id="tDist">—</span></span>
-    <span><span class="k">cost = rent + λ·d</span><span class="v" id="tCost">—</span></span>
-    <span><span class="k">on the pareto frontier</span><span class="v" id="tPareto">—</span></span>
+    <span><span class="k">best under your caps</span><span class="v win" id="tWin">—</span></span>
+    <span><span class="k">rent</span><span class="v" id="tRent">—</span></span>
+    <span><span class="k">avg commute</span><span class="v" id="tDist">—</span></span>
+    <span><span class="k">within caps</span><span class="v" id="tFeas">—</span></span>
+    <span><span class="k">pareto frontier</span><span class="v" id="tPareto">—</span></span>
   </div>
+  <p class="status" id="status"></p>
 
   <div class="panels">
     <div class="panel">
       <h2>the map</h2>
-      <p class="note">circles colored by median rent · click anywhere or drag the ✕ to move your commute pin</p>
+      <p class="note">circles colored by rent · ✕ = your destinations (drag to move) · click a circle for its routes</p>
       <div id="map"></div>
       <div class="legend" id="mapLegend"></div>
+      <div class="route-panel" id="routePanel"></div>
     </div>
     <div class="panel">
-      <h2>rent vs. distance</h2>
-      <p class="note">each dot one neighborhood · hover to identify · blue = pareto frontier, orange = argmin</p>
-      <svg id="scatter" viewBox="0 0 560 470" role="img" aria-label="scatter plot of median rent against distance to pin"></svg>
+      <h2>rent vs. commute</h2>
+      <p class="note">each dot one candidate · hover to identify · blue = pareto frontier, orange = argmin</p>
+      <svg id="scatter" viewBox="0 0 560 470" role="img" aria-label="scatter plot of rent against commute"></svg>
       <div class="legend">
-        <span><i class="chip" style="background:var(--winner)"></i>optimal for current λ</span>
+        <span><i class="chip" style="background:var(--winner)"></i>best under your caps</span>
         <span><i class="chip" style="background:var(--series-blue)"></i>pareto frontier</span>
-        <span><i class="chip" style="background:var(--dominated)"></i>dominated (something is both closer &amp; cheaper)</span>
+        <span><i class="chip" style="background:var(--dominated)"></i>dominated</span>
+        <span><i class="chip diamond" style="background:var(--series-blue)"></i>your pasted listings</span>
       </div>
     </div>
   </div>
 
   <div class="panel" id="tablePanel">
-    <h2>ranked by cost = rent + λ·distance</h2>
-    <p class="note">same data as the chart, sortable by eye — blue edge marks the pareto frontier, orange row is the argmin</p>
+    <h2>ranked by your objective, feasible first</h2>
+    <p class="note">blue edge = pareto frontier · orange row = argmin · links open live StreetEasy listings</p>
     <table class="rank" id="rankTable">
-      <thead><tr><th>#</th><th>neighborhood</th><th>borough</th>
-        <th class="num">rent $/mo</th><th class="num">km</th><th class="num">cost $/mo</th></tr></thead>
+      <thead><tr><th>#</th><th>candidate</th><th>borough</th>
+        <th class="num">rent $/mo</th><th class="num" id="thMetric">min</th><th class="num">within caps</th><th>listings</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -210,228 +294,677 @@
 
 <script>
 (async function () {
-  const DATA = await (await fetch('/rentmap-data.json')).json();
-  const state = { bd: 'all', lambda: 100, pin: { lat: 40.7359, lng: -73.9906 }, hover: null };
+  // ---- config / persistence ----
+  const GMAPS_KEY_DEFAULT = '';           // paste a referrer-restricted key here for deploys
+  const LS = {
+    key: 'traphaus_gmaps_key', state: 'traphaus_state', dmCachePrefix: 'traphaus_dm|',
+  };
+  const DM_CACHE_TTL_MS = 30 * 24 * 3600 * 1000;   // 30-day cache per Google Maps caching policy
+  const gmapsKey = localStorage.getItem(LS.key) || GMAPS_KEY_DEFAULT;
+  const GOOGLE = !!gmapsKey;
+
+  const DATA = await (await fetch('./rentmap-data.json')).json();
+
+  const saved = JSON.parse(localStorage.getItem(LS.state) || 'null');
+  const state = Object.assign({
+    bd: 'all', objective: 'rent', maxRent: null, maxT: null,   // null = no cap
+    dests: [{ id: 'd1', name: 'work (union square)', lat: 40.7359, lng: -73.9906, w: 5 }],
+    customs: [], selected: null,
+  }, saved || {});
+  state.hover = null; state.addingDest = false;
+  const MODES = ['transit', 'walking'];   // fastest wins per trip, automatically
+  const persist = () => localStorage.setItem(LS.state, JSON.stringify({
+    bd: state.bd, objective: state.objective, maxRent: state.maxRent, maxT: state.maxT,
+    dests: state.dests, customs: state.customs,
+  }));
 
   const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
   const darkMode = () => matchMedia('(prefers-color-scheme: dark)').matches;
-  // sequential blue ramp (light: darker = pricier; dark surface: lighter = pricier)
   const RAMP_LIGHT = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#104281'];
   const ramp = () => darkMode() ? [...RAMP_LIGHT].reverse() : RAMP_LIGHT;
-
   const fmt$ = v => '$' + Math.round(v).toLocaleString('en-US');
-  const haversine = (a, b) => {
-    const R = 6371, r = Math.PI / 180;
-    const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
-    const s = Math.sin(dLat / 2) ** 2 +
-      Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(s));
+  const metricUnit = GOOGLE ? 'min' : 'km';
+  document.querySelectorAll('.metricUnit').forEach(e => e.textContent = GOOGLE ? 'minute' : 'km');
+  document.getElementById('thMetric').textContent = metricUnit;
+  if (!GOOGLE) {
+    document.getElementById('keyBanner').style.display = 'block';
+    const tEl = document.getElementById('maxT');
+    tEl.min = 1; tEl.max = 35; tEl.step = 1; tEl.value = 35;   // km in fallback
+  }
+  document.getElementById('keySave').onclick = () => {
+    const v = document.getElementById('keyInput').value.trim();
+    if (v) { localStorage.setItem(LS.key, v); location.reload(); }
   };
 
-  // ---- model: rows for current bedroom type, pareto flags, argmin ----
-  function compute() {
-    const rows = DATA.neighborhoods
-      .filter(n => n.rent[state.bd])
-      .map((n, i) => ({ ...n, r: n.rent[state.bd], d: haversine(state.pin, n) }));
-    rows.forEach(x => x.cost = x.r + state.lambda * x.d);
-    // pareto frontier: sweep by distance, keep strict running-min rent
-    const byD = [...rows].sort((a, b) => a.d - b.d || a.r - b.r);
-    let best = Infinity;
-    byD.forEach(x => { x.pareto = x.r < best; if (x.r < best) best = x.r; });
-    const win = rows.reduce((m, x) => x.cost < m.cost ? x : m, rows[0]);
-    rows.forEach(x => x.win = x === win);
-    return { rows, win };
+  const haversineKm = (a, b) => {
+    const R = 6371, r = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  };
+  const nextMonday9am = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+    d.setHours(9, 0, 0, 0);
+    return d;
+  };
+
+  // ---- candidates: neighborhoods + pasted listings ----
+  function candidates() {
+    const ns = DATA.neighborhoods.filter(n => n.rent[state.bd]).map(n => ({
+      id: 'n|' + n.name, name: n.name, boro: n.boro, lat: n.lat, lng: n.lng,
+      r: n.rent[state.bd], custom: false,
+    }));
+    const cs = state.customs.map(c => ({
+      id: 'c|' + c.id, name: c.name, boro: 'listing', lat: c.lat, lng: c.lng, r: c.rent, custom: true,
+    }));
+    return ns.concat(cs);
   }
 
-  // quantile bins → ramp colors for the map
+  // ---- travel-time provider ----
+  const pairKey = (mode, o, d) => `${mode}|${o.lat.toFixed(5)},${o.lng.toFixed(5)}|${d.lat.toFixed(5)},${d.lng.toFixed(5)}`;
+  const memCache = new Map();
+  function cacheGet(k) {
+    if (memCache.has(k)) return memCache.get(k);
+    try {
+      const raw = localStorage.getItem(LS.dmCachePrefix + k);
+      if (!raw) return undefined;
+      const { m, ts } = JSON.parse(raw);
+      if (Date.now() - ts > DM_CACHE_TTL_MS) { localStorage.removeItem(LS.dmCachePrefix + k); return undefined; }
+      memCache.set(k, m);
+      return m;
+    } catch { return undefined; }
+  }
+  function cacheSet(k, m) {
+    memCache.set(k, m);
+    try { localStorage.setItem(LS.dmCachePrefix + k, JSON.stringify({ m, ts: Date.now() })); } catch {}
+  }
+
+  let fetchGen = 0;
+  async function ensureMinutes(cands) {
+    if (!GOOGLE) return; // fallback: km computed synchronously in compute()
+    const gen = ++fetchGen;
+    const svc = new google.maps.DistanceMatrixService();
+    const dep = nextMonday9am();
+    for (const mode of MODES) {
+      const origins = [...new Set(cands.filter(o =>
+        state.dests.some(d => cacheGet(pairKey(mode, o, d)) === undefined)))];
+      if (!origins.length) continue;
+      const dests = state.dests;
+      const perReq = Math.max(1, Math.min(25, Math.floor(100 / dests.length)));
+      let done = 0;
+      for (let i = 0; i < origins.length; i += perReq) {
+        if (gen !== fetchGen) return; // superseded
+        const chunk = origins.slice(i, i + perReq);
+        setStatus(`fetching ${mode} times from google… ${done}/${origins.length} candidates (cached pairs skipped)`);
+        const res = await new Promise((resolve, reject) =>
+          svc.getDistanceMatrix({
+            origins: chunk.map(o => ({ lat: o.lat, lng: o.lng })),
+            destinations: dests.map(d => ({ lat: d.lat, lng: d.lng })),
+            travelMode: mode.toUpperCase(),
+            transitOptions: mode === 'transit' ? { departureTime: dep } : undefined,
+          }, (r, s) => s === 'OK' ? resolve(r) : reject(new Error('DistanceMatrix: ' + s))));
+        chunk.forEach((o, oi) => dests.forEach((d, di) => {
+          const el = res.rows[oi].elements[di];
+          cacheSet(pairKey(mode, o, d), el.status === 'OK' ? el.duration.value / 60 : null);
+        }));
+        done += chunk.length;
+      }
+    }
+    setStatus('');
+  }
+
+  // fastest available mode for a pair; undefined = not fetched yet, null = unroutable
+  function pairMinutes(o, d) {
+    let best, pending = false;
+    for (const mode of MODES) {
+      const m = cacheGet(pairKey(mode, o, d));
+      if (m === undefined) pending = true;
+      else if (m !== null && (best === undefined || m < best.m)) best = { m, mode };
+    }
+    if (best) return best;
+    return pending ? undefined : null;
+  }
+
+  // ---- model: ε-constraint bi-objective, solved by exact enumeration ----
+  function compute() {
+    const W = state.dests.reduce((s, d) => s + (+d.w || 0), 0) || 1;
+    const rows = [];
+    let missing = 0;
+    for (const o of candidates()) {
+      let acc = 0, ok = true; const modes = [];
+      for (const d of state.dests) {
+        if (GOOGLE) {
+          const p = pairMinutes(o, d);
+          if (p === undefined || p === null) { ok = false; break; }
+          acc += (+d.w || 0) * p.m; modes.push(p.mode);
+        } else {
+          acc += (+d.w || 0) * haversineKm(o, d);
+        }
+      }
+      if (!ok) { missing++; continue; }
+      const t = acc / W;
+      rows.push({
+        ...o, t,
+        via: modes.length ? (modes.every(m => m === 'walking') ? 'walk' : 'transit') : null,
+        feasible: (state.maxRent == null || o.r <= state.maxRent) && (state.maxT == null || t <= state.maxT),
+      });
+    }
+    const byT = [...rows].sort((a, b) => a.t - b.t || a.r - b.r);
+    let best = Infinity;
+    byT.forEach(x => { x.pareto = x.r < best; if (x.r < best) best = x.r; });
+    const feas = rows.filter(x => x.feasible);
+    const win = feas.length ? feas.reduce((m, x) =>
+      (state.objective === 'rent' ? (x.r - m.r || x.t - m.t) : (x.t - m.t || x.r - m.r)) < 0 ? x : m,
+      feas[0]) : null;
+    rows.forEach(x => x.win = x === win);
+    return { rows, win, missing, nFeasible: feas.length };
+  }
+
   function binner(rows) {
     const vals = rows.map(x => x.r).sort((a, b) => a - b);
     const steps = ramp();
-    const qs = steps.map((_, i) => vals[Math.min(vals.length - 1,
-      Math.floor((i + 1) / steps.length * vals.length))]);
+    const qs = steps.map((_, i) => vals[Math.min(vals.length - 1, Math.floor((i + 1) / steps.length * vals.length))]);
     return { color: v => steps[qs.findIndex(q => v <= q)], qs, steps };
   }
 
-  // ---- tooltip (shared by map + scatter) ----
+  const bdLabel = () => ({ all: 'all-size', studio: 'studio', '1br': '1-br', '2br': '2-br', '3br': '3+-br' })[state.bd];
+  const seSlug = n => n.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim().replace(/ +/g, '-');
+  const seBeds = () => ({ studio: 0, '1br': 1, '2br': 2, '3br': 3 })[state.bd];
+  const seLink = x => x.custom ? null :
+    `https://streeteasy.com/for-rent/${seSlug(x.name)}` + (state.bd !== 'all' ? `/beds:${seBeds()}` : '');
+
+  // ---- tooltip ----
   const tt = document.getElementById('tooltip');
   function showTip(x, ev) {
-    tt.innerHTML = `<div class="tt-name">${x.name} · ${x.boro}</div>
-      <div class="tt-row">median ${labelBd()} rent <b>${fmt$(x.r)}</b>/mo</div>
-      <div class="tt-row">distance <b>${x.d.toFixed(1)} km</b></div>
-      <div class="tt-row">cost at λ=$${state.lambda} <b>${fmt$(x.cost)}</b>/mo</div>
-      ${x.win ? '<div class="tt-row"><b style="color:var(--winner)">optimal for this λ</b></div>'
-        : x.pareto ? '<div class="tt-row"><b style="color:var(--series-blue)">on the pareto frontier</b></div>' : ''}`;
+    tt.innerHTML = `<div class="tt-name">${x.name}${x.custom ? ' (your listing)' : ' · ' + x.boro}</div>
+      <div class="tt-row">${x.custom ? 'asking' : `median ${bdLabel()}`} rent <b>${fmt$(x.r)}</b>/mo</div>
+      <div class="tt-row">avg commute <b>${x.t.toFixed(GOOGLE ? 0 : 1)} ${metricUnit}</b>${x.via ? ` <small>via ${x.via}</small>` : ''}</div>
+      ${x.win ? '<div class="tt-row"><b style="color:var(--winner)">best under your caps</b></div>'
+        : !x.feasible ? '<div class="tt-row">outside your caps</div>'
+        : x.pareto ? '<div class="tt-row"><b style="color:var(--series-blue)">on the pareto frontier</b></div>' : ''}
+      <div class="tt-row">click for routes${x.custom ? '' : ' + live listings link'}</div>`;
     tt.style.display = 'block';
     const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
     tt.style.left = Math.min(innerWidth - w - 8, ev.clientX + pad) + 'px';
     tt.style.top = (ev.clientY + h + pad > innerHeight ? ev.clientY - h - pad : ev.clientY + pad) + 'px';
   }
   const hideTip = () => { tt.style.display = 'none'; };
-  const labelBd = () => ({ all: 'all-size', studio: 'studio', '1br': '1-br', '2br': '2-br', '3br': '3+-br' })[state.bd];
+  const setStatus = s => { document.getElementById('status').textContent = s; };
 
-  // ---- map ----
-  const map = L.map('map', { scrollWheelZoom: true }).setView([40.72, -73.94], 11);
-  function tiles() {
-    const kind = darkMode() ? 'dark_all' : 'light_all';
-    return L.tileLayer(`https://{s}.basemaps.cartocdn.com/${kind}/{z}/{x}/{y}{r}.png`, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      maxZoom: 18
+  // ================= map adapters =================
+  let mapApi;   // {addCircle, clearCircles, syncDestMarkers, drawRoutes(x), clearRoutes, onMapClick}
+
+  function initLeaflet() {
+    const map = L.map('map', { scrollWheelZoom: true }).setView([40.72, -73.94], 11);
+    const kind = () => darkMode() ? 'dark_all' : 'light_all';
+    let tl = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${kind()}/{z}/{x}/{y}{r}.png`, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 18,
+    }).addTo(map);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      map.removeLayer(tl);
+      tl = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${kind()}/{z}/{x}/{y}{r}.png`, { maxZoom: 18 }).addTo(map);
+      render();
     });
+    const circles = L.layerGroup().addTo(map);
+    const destMarks = L.layerGroup().addTo(map);
+    const routeLayer = L.layerGroup().addTo(map);
+    map.on('click', e => handleMapClick(e.latlng.lat, e.latlng.lng));
+    mapApi = {
+      clearCircles: () => circles.clearLayers(),
+      addCircle(x, { color, radius, opacity }) {
+        const c = L.circleMarker([x.lat, x.lng], {
+          radius, fillColor: color, fillOpacity: opacity ?? 0.92, color: css('--surface-1'), weight: 2,
+        }).addTo(circles);
+        c.on('mousemove', ev => { state.hover = x.id; showTip(x, ev.originalEvent); });
+        c.on('mouseout', () => { state.hover = null; hideTip(); });
+        c.on('click', ev => { L.DomEvent.stopPropagation(ev); selectCandidate(x); });
+      },
+      syncDestMarkers() {
+        destMarks.clearLayers();
+        state.dests.forEach(d => {
+          const m = L.marker([d.lat, d.lng], {
+            draggable: true,
+            icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+              html: `<div style="font:bold 22px system-ui;line-height:26px;text-align:center;color:${css('--winner')};text-shadow:0 0 4px ${css('--surface-1')}">✕</div>` }),
+            title: d.name,
+          }).addTo(destMarks);
+          m.on('dragend', () => { const p = m.getLatLng(); d.lat = p.lat; d.lng = p.lng; persist(); refresh(); });
+        });
+      },
+      clearRoutes: () => routeLayer.clearLayers(),
+      async drawRoutes(x) {
+        routeLayer.clearLayers();
+        const html = state.dests.map(d => {
+          L.polyline([[x.lat, x.lng], [d.lat, d.lng]], { color: css('--series-blue'), weight: 2, dashArray: '6 6' }).addTo(routeLayer);
+          return `<div class="route-leg">→ ${d.name}: <b>${haversineKm(x, d).toFixed(1)} km</b> straight-line</div>`;
+        }).join('');
+        return html + `<div class="route-leg">add a google maps key for real routes.</div>`;
+      },
+    };
   }
-  let tileLayer = tiles().addTo(map);
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    map.removeLayer(tileLayer); tileLayer = tiles().addTo(map); render();
-  });
 
-  const pinIcon = () => L.divIcon({
-    className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-    html: `<div style="font: bold 22px system-ui; line-height:26px; text-align:center; color:${css('--winner')}; text-shadow:0 0 4px ${css('--surface-1')}">✕</div>`
-  });
-  const pin = L.marker(state.pin, { draggable: true, icon: pinIcon(), title: 'your commute destination' }).addTo(map);
-  pin.on('drag dragend', () => { state.pin = pin.getLatLng(); render(); });
-  map.on('click', e => { state.pin = e.latlng; pin.setLatLng(e.latlng); render(); });
-
-  const circleLayer = L.layerGroup().addTo(map);
-  function renderMap(rows, bins) {
-    circleLayer.clearLayers();
-    rows.forEach(x => {
-      const c = L.circleMarker([x.lat, x.lng], {
-        radius: x.win ? 11 : 7,
-        fillColor: x.win ? css('--winner') : bins.color(x.r),
-        fillOpacity: 0.92,
-        color: css('--surface-1'), weight: 2,   // 2px surface ring
-        className: 'hoodCircle'
-      }).addTo(circleLayer);
-      c.on('mousemove', ev => { state.hover = x.name; showTip(x, ev.originalEvent); paintHover(); });
-      c.on('mouseout', () => { state.hover = null; hideTip(); paintHover(); });
+  function initGoogle() {
+    const styleFor = dark => [
+      { elementType: 'geometry', stylers: [{ saturation: -85 }, { lightness: dark ? -55 : 20 }] },
+      { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+      { featureType: 'transit.station', elementType: 'labels.icon', stylers: [{ visibility: 'simplified' }] },
+      { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'simplified' }] },
+    ];
+    const map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: 40.72, lng: -73.94 }, zoom: 11,
+      styles: styleFor(darkMode()), disableDefaultUI: true, zoomControl: true, clickableIcons: false,
     });
-    const leg = document.getElementById('mapLegend');
-    leg.innerHTML = `<span>median ${labelBd()} rent:</span><span>${fmt$(Math.min(...rows.map(x => x.r)))}</span>
-      <span class="rampbar">${bins.steps.map(s => `<i style="background:${s}"></i>`).join('')}</span>
-      <span>${fmt$(Math.max(...rows.map(x => x.r)))}</span>
-      <span style="margin-left:12px"><i class="chip" style="background:var(--winner)"></i>optimal for λ</span>`;
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () =>
+      map.setOptions({ styles: styleFor(darkMode()) }));
+    let circles = [], destMarks = [], routeLines = [];
+    map.addListener('click', e => handleMapClick(e.latLng.lat(), e.latLng.lng()));
+
+    // places autocomplete for adding destinations
+    const searchEl = document.getElementById('destSearch');
+    const ac = new google.maps.places.Autocomplete(searchEl, {
+      fields: ['geometry', 'name'], bounds: new google.maps.LatLngBounds({ lat: 40.49, lng: -74.27 }, { lat: 40.92, lng: -73.68 }),
+    });
+    ac.addListener('place_changed', () => {
+      const p = ac.getPlace();
+      if (!p.geometry) return;
+      addDest(p.geometry.location.lat(), p.geometry.location.lng(), p.name);
+      searchEl.value = '';
+    });
+
+    const dirSvc = new google.maps.DirectionsService();
+    mapApi = {
+      clearCircles: () => { circles.forEach(c => c.setMap(null)); circles = []; },
+      addCircle(x, { color, radius, opacity }) {
+        const m = new google.maps.Marker({
+          map, position: { lat: x.lat, lng: x.lng }, zIndex: x.win ? 30 : x.custom ? 20 : 10,
+          icon: {
+            path: x.custom ? 'M 0 -1.3 L 1.3 0 L 0 1.3 L -1.3 0 Z' : google.maps.SymbolPath.CIRCLE,
+            scale: radius, fillColor: color, fillOpacity: opacity ?? 0.92,
+            strokeColor: css('--surface-1'), strokeWeight: 2,
+          },
+        });
+        m.addListener('mouseover', ev => { state.hover = x.id; showTip(x, ev.domEvent); });
+        m.addListener('mousemove', ev => showTip(x, ev.domEvent));
+        m.addListener('mouseout', () => { state.hover = null; hideTip(); });
+        m.addListener('click', () => selectCandidate(x));
+        circles.push(m);
+      },
+      syncDestMarkers() {
+        destMarks.forEach(m => m.setMap(null)); destMarks = [];
+        state.dests.forEach(d => {
+          const m = new google.maps.Marker({
+            map, position: { lat: d.lat, lng: d.lng }, draggable: true, title: d.name, zIndex: 40,
+            label: { text: '✕', color: css('--winner'), fontWeight: 'bold', fontSize: '20px' },
+            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 },
+          });
+          m.addListener('dragend', () => {
+            const p = m.getPosition(); d.lat = p.lat(); d.lng = p.lng(); persist(); refresh();
+          });
+          destMarks.push(m);
+        });
+      },
+      clearRoutes: () => { routeLines.forEach(l => l.setMap(null)); routeLines = []; },
+      async drawRoutes(x) {
+        this.clearRoutes();
+        const parts = [];
+        for (const d of state.dests) {
+          const mode = (pairMinutes(x, d) || {}).mode || 'transit';   // draw the mode that won
+          try {
+            const res = await new Promise((resolve, reject) => dirSvc.route({
+              origin: { lat: x.lat, lng: x.lng }, destination: { lat: d.lat, lng: d.lng },
+              travelMode: mode.toUpperCase(),
+              transitOptions: mode === 'transit' ? { departureTime: nextMonday9am() } : undefined,
+            }, (r, s) => s === 'OK' ? resolve(r) : reject(new Error(s))));
+            const leg = res.routes[0].legs[0];
+            const stepsHtml = [];
+            for (const st of leg.steps) {
+              const isTransit = st.travel_mode === 'TRANSIT';
+              const color = isTransit ? (st.transit.line.color || css('--series-blue')) : css('--muted');
+              routeLines.push(new google.maps.Polyline({
+                map, path: st.path, strokeColor: color,
+                strokeOpacity: isTransit ? 0.9 : 0, strokeWeight: 4,
+                zIndex: 25,
+                icons: isTransit ? undefined : [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.7, strokeColor: css('--muted'), scale: 2 }, offset: '0', repeat: '10px' }],
+              }));
+              if (isTransit) {
+                const l = st.transit.line;
+                stepsHtml.push(`<span class="lpill" style="background:${l.color || '#555'};color:${l.text_color || '#fff'}">${l.short_name || l.name}</span> ${Math.round(st.duration.value / 60)}m`);
+              } else if (st.duration.value > 90) {
+                stepsHtml.push(`walk ${Math.round(st.duration.value / 60)}m`);
+              }
+            }
+            parts.push(`<div class="route-leg">→ ${d.name}: <b>${Math.round(leg.duration.value / 60)} min</b> · ${stepsHtml.join(' · ')}</div>`);
+          } catch (e) {
+            parts.push(`<div class="route-leg">→ ${d.name}: no route (${e.message})</div>`);
+          }
+        }
+        return parts.join('');
+      },
+    };
+  }
+
+  // fallback address dropdown via Photon (OSM) — only wired when no Google key
+  function initPhotonSearch() {
+    const input = document.getElementById('destSearch');
+    const list = document.getElementById('acList');
+    let timer = null, results = [], sel = -1;
+    const close = () => { list.className = 'ac-list'; list.innerHTML = ''; results = []; sel = -1; };
+    const pick = i => {
+      const r = results[i]; if (!r) return;
+      addDest(r.geometry.coordinates[1], r.geometry.coordinates[0], r.properties.name || input.value);
+      input.value = ''; close();
+    };
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 3) { close(); return; }
+      timer = setTimeout(async () => {
+        try {
+          const u = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=40.72&lon=-73.95&limit=5`;
+          const j = await (await fetch(u)).json();
+          results = j.features || []; sel = -1;
+          list.innerHTML = results.map((f, i) => {
+            const p = f.properties;
+            const line2 = [p.street && p.housenumber ? `${p.housenumber} ${p.street}` : p.street,
+              p.district || p.city, p.state].filter(Boolean).join(', ');
+            return `<div class="ac-item" data-i="${i}">${p.name || line2}<small>${line2}</small></div>`;
+          }).join('');
+          list.className = results.length ? 'ac-list on' : 'ac-list';
+          list.querySelectorAll('.ac-item').forEach(el =>
+            el.addEventListener('mousedown', e => { e.preventDefault(); pick(+el.dataset.i); }));
+        } catch { close(); }
+      }, 300);
+    });
+    input.addEventListener('keydown', e => {
+      if (!results.length) return;
+      if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, results.length - 1); }
+      else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); }
+      else if (e.key === 'Enter') { e.preventDefault(); pick(Math.max(sel, 0)); return; }
+      else if (e.key === 'Escape') { close(); return; }
+      else return;
+      e.preventDefault();
+      list.querySelectorAll('.ac-item').forEach((el, i) => el.classList.toggle('sel', i === sel));
+    });
+    input.addEventListener('blur', () => setTimeout(close, 150));
+  }
+
+  function handleMapClick(lat, lng) {
+    if (state.addingDest) {
+      state.addingDest = false;
+      document.getElementById('destClick').classList.remove('arm');
+      addDest(lat, lng, `place ${state.dests.length + 1}`);
+    } else {
+      state.selected = null;
+      mapApi.clearRoutes();
+      document.getElementById('routePanel').className = 'route-panel';
+    }
+  }
+
+  async function selectCandidate(x) {
+    state.selected = x.id;
+    const rp = document.getElementById('routePanel');
+    rp.className = 'route-panel on';
+    const link = seLink(x);
+    rp.innerHTML = `<h3>${x.name} — ${fmt$(x.r)}/mo${x.custom ? '' : ` median ${bdLabel()}`}</h3>
+      ${link ? `<div class="route-leg"><a href="${link}" target="_blank" rel="noopener">→ browse live StreetEasy listings in ${x.name}</a></div>` : ''}
+      <div class="route-leg">fetching routes…</div>`;
+    const html = await mapApi.drawRoutes(x);
+    rp.innerHTML = `<h3>${x.name} — ${fmt$(x.r)}/mo${x.custom ? '' : ` median ${bdLabel()}`}</h3>
+      ${link ? `<div class="route-leg"><a href="${link}" target="_blank" rel="noopener">→ browse live StreetEasy listings in ${x.name}</a></div>` : ''}` + html;
+  }
+
+  // ---- destinations editor ----
+  function addDest(lat, lng, name) {
+    state.dests.push({ id: 'd' + Date.now(), name, lat, lng, w: 3 });
+    persist(); refresh();
+  }
+  function renderDests() {
+    const el = document.getElementById('destList');
+    el.innerHTML = '';
+    state.dests.forEach(d => {
+      const row = document.createElement('div');
+      row.className = 'dest-row';
+      row.innerHTML = `<span class="dot"></span>
+        <input class="dname" name="dname-${d.id}" value="${d.name.replace(/"/g, '&quot;')}" aria-label="journey name" />
+        <input class="dw" name="dw-${d.id}" type="number" min="0" step="1" value="${d.w}" aria-label="trips per week" /><span class="wunit">/wk</span>
+        <button class="del" title="remove">✕</button>`;
+      row.querySelector('.dname').onchange = e => { d.name = e.target.value; persist(); render(); };
+      row.querySelector('.dw').onchange = e => { d.w = +e.target.value || 0; persist(); refresh(); };
+      row.querySelector('.del').onclick = () => {
+        if (state.dests.length <= 1) return;
+        state.dests = state.dests.filter(x => x !== d); persist(); refresh();
+      };
+      el.appendChild(row);
+    });
+    mapApi.syncDestMarkers();
   }
 
   // ---- scatter ----
   const svg = document.getElementById('scatter');
   const M = { l: 64, r: 16, t: 12, b: 46 }, W = 560, H = 470;
   function renderScatter(rows) {
-    const xmax = Math.max(...rows.map(x => x.d)) * 1.04;
+    if (!rows.length) { svg.innerHTML = ''; return; }
+    const xmax = Math.max(...rows.map(x => x.t)) * 1.04;
     const ymin = Math.min(...rows.map(x => x.r)), ymax = Math.max(...rows.map(x => x.r));
-    const ypad = (ymax - ymin) * 0.06;
-    const X = d => M.l + d / xmax * (W - M.l - M.r);
+    const ypad = (ymax - ymin) * 0.06 || 100;
+    const X = t => M.l + t / xmax * (W - M.l - M.r);
     const Y = r => H - M.b - (r - ymin + ypad) / (ymax - ymin + 2 * ypad) * (H - M.t - M.b);
     let s = '';
-    // hairline grid + axes
-    const xticks = 5, yticks = 5;
-    for (let i = 0; i <= xticks; i++) {
-      const v = xmax / xticks * i, px = X(v);
+    for (let i = 0; i <= 5; i++) {
+      const v = xmax / 5 * i, px = X(v);
       s += `<line x1="${px}" y1="${M.t}" x2="${px}" y2="${H - M.b}" stroke="var(--grid)" stroke-width="1"/>`;
       s += `<text class="axis" x="${px}" y="${H - M.b + 16}" text-anchor="middle">${v.toFixed(0)}</text>`;
     }
-    for (let i = 0; i <= yticks; i++) {
-      const v = ymin - ypad + (ymax - ymin + 2 * ypad) / yticks * i, py = Y(v);
+    for (let i = 0; i <= 5; i++) {
+      const v = ymin - ypad + (ymax - ymin + 2 * ypad) / 5 * i, py = Y(v);
       s += `<line x1="${M.l}" y1="${py}" x2="${W - M.r}" y2="${py}" stroke="var(--grid)" stroke-width="1"/>`;
       s += `<text class="axis" x="${M.l - 8}" y="${py + 4}" text-anchor="end">${fmt$(v)}</text>`;
     }
     s += `<line x1="${M.l}" y1="${H - M.b}" x2="${W - M.r}" y2="${H - M.b}" stroke="var(--baseline)" stroke-width="1"/>`;
-    s += `<text class="axis-title" x="${(M.l + W - M.r) / 2}" y="${H - 8}" text-anchor="middle">straight-line distance to your pin (km)</text>`;
-    s += `<text class="axis-title" transform="rotate(-90 14 ${(M.t + H - M.b) / 2})" x="14" y="${(M.t + H - M.b) / 2}" text-anchor="middle">median asking rent ($/mo)</text>`;
-    // pareto step line
-    const front = rows.filter(x => x.pareto).sort((a, b) => a.d - b.d);
+    // constraint caps as solid hairline guides with a small label
+    if (state.maxT != null && state.maxT < xmax) {
+      const px = X(state.maxT);
+      s += `<line x1="${px}" y1="${M.t}" x2="${px}" y2="${H - M.b}" stroke="var(--winner)" stroke-width="1" opacity="0.6"/>`;
+      s += `<text class="axis" x="${px + 4}" y="${M.t + 12}" fill="var(--winner)">cap</text>`;
+    }
+    if (state.maxRent != null && state.maxRent < ymax) {
+      const py = Y(state.maxRent);
+      s += `<line x1="${M.l}" y1="${py}" x2="${W - M.r}" y2="${py}" stroke="var(--winner)" stroke-width="1" opacity="0.6"/>`;
+      s += `<text class="axis" x="${W - M.r - 4}" y="${py - 4}" text-anchor="end" fill="var(--winner)">cap</text>`;
+    }
+    const xlab = GOOGLE ? 'trip-weighted one-way minutes (fastest of transit/walk, next mon 9am)' : 'trip-weighted straight-line distance (km)';
+    s += `<text class="axis-title" x="${(M.l + W - M.r) / 2}" y="${H - 8}" text-anchor="middle">${xlab}</text>`;
+    s += `<text class="axis-title" transform="rotate(-90 14 ${(M.t + H - M.b) / 2})" x="14" y="${(M.t + H - M.b) / 2}" text-anchor="middle">asking rent ($/mo)</text>`;
+    const front = rows.filter(x => x.pareto).sort((a, b) => a.t - b.t);
     if (front.length > 1) {
-      let p = `M ${X(front[0].d)} ${Y(front[0].r)}`;
+      let p = `M ${X(front[0].t)} ${Y(front[0].r)}`;
       for (let i = 1; i < front.length; i++)
-        p += ` L ${X(front[i].d)} ${Y(front[i - 1].r)} L ${X(front[i].d)} ${Y(front[i].r)}`;
+        p += ` L ${X(front[i].t)} ${Y(front[i - 1].r)} L ${X(front[i].t)} ${Y(front[i].r)}`;
       s += `<path d="${p}" fill="none" stroke="var(--series-blue)" stroke-width="2" opacity="0.45"/>`;
     }
-    // dots: dominated under frontier under winner; big invisible hit targets
     const order = [...rows].sort((a, b) => (a.win - b.win) || (a.pareto - b.pareto));
     order.forEach(x => {
-      const hov = state.hover === x.name;
       const fill = x.win ? 'var(--winner)' : x.pareto ? 'var(--series-blue)' : 'var(--dominated)';
-      const rr = x.win ? 8 : hov ? 7 : 4.5;
-      s += `<circle data-n="${x.name.replace(/"/g, '&quot;')}" cx="${X(x.d)}" cy="${Y(x.r)}" r="${rr}"
-              fill="${fill}" stroke="var(--surface-1)" stroke-width="2"/>`;
-      s += `<circle data-hit="${x.name.replace(/"/g, '&quot;')}" cx="${X(x.d)}" cy="${Y(x.r)}" r="12" fill="transparent"/>`;
+      const rr = x.win ? 8 : 4.5;
+      const op = x.feasible || x.win ? 1 : 0.3;
+      const esc = x.id.replace(/"/g, '&quot;');
+      if (x.custom) {
+        const px = X(x.t), py = Y(x.r), q = rr + 1.5;
+        s += `<rect data-n="${esc}" x="${px - q / 1.4}" y="${py - q / 1.4}" width="${q * 1.42}" height="${q * 1.42}" opacity="${op}"
+                transform="rotate(45 ${px} ${py})" fill="${fill}" stroke="var(--surface-1)" stroke-width="2"/>`;
+      } else {
+        s += `<circle data-n="${esc}" cx="${X(x.t)}" cy="${Y(x.r)}" r="${rr}" fill="${fill}" opacity="${op}" stroke="var(--surface-1)" stroke-width="2"/>`;
+      }
+      s += `<circle data-hit="${esc}" cx="${X(x.t)}" cy="${Y(x.r)}" r="12" fill="transparent" style="cursor:pointer"/>`;
     });
-    // selective direct labels: winner + frontier endpoints
-    const lbl = new Set([rows.find(x => x.win), front[0], front[front.length - 1]].filter(Boolean));
+    const lbl = new Set([rows.find(x => x.win), front[0], front[front.length - 1], ...rows.filter(x => x.custom)].filter(Boolean));
     lbl.forEach(x => {
-      const anchor = X(x.d) > W - 120 ? 'end' : 'start';
-      const dx = anchor === 'end' ? -10 : 10;
-      s += `<text class="dlabel" x="${X(x.d) + dx}" y="${Y(x.r) + 4}" text-anchor="${anchor}">${x.name}</text>`;
+      const anchor = X(x.t) > W - 120 ? 'end' : 'start';
+      s += `<text class="dlabel" x="${X(x.t) + (anchor === 'end' ? -10 : 10)}" y="${Y(x.r) + 4}" text-anchor="${anchor}">${x.name}</text>`;
     });
     svg.innerHTML = s;
     svg.querySelectorAll('[data-hit]').forEach(el => {
-      const x = rows.find(r => r.name === el.dataset.hit);
-      el.addEventListener('mousemove', ev => { state.hover = x.name; showTip(x, ev); paintHover(); });
-      el.addEventListener('mouseout', () => { state.hover = null; hideTip(); paintHover(); });
-    });
-  }
-  function paintHover() {
-    svg.querySelectorAll('circle[data-n]').forEach(el => {
-      const hov = el.dataset.n === state.hover;
-      if (!el.dataset.baseR) el.dataset.baseR = el.getAttribute('r');
-      el.setAttribute('r', hov ? Math.max(7, +el.dataset.baseR) : el.dataset.baseR);
+      const x = rows.find(r => r.id === el.dataset.hit);
+      el.addEventListener('mousemove', ev => { state.hover = x.id; showTip(x, ev); });
+      el.addEventListener('mouseout', () => { state.hover = null; hideTip(); });
+      el.addEventListener('click', () => selectCandidate(x));
     });
   }
 
-  // ---- table view ----
+  // ---- map circles + legend ----
+  function renderMap(rows, bins) {
+    mapApi.clearCircles();
+    rows.forEach(x => mapApi.addCircle(x, {
+      color: x.win ? css('--winner') : bins.color(x.r),
+      radius: x.win ? 11 : x.custom ? 8 : 7,
+      opacity: x.feasible || x.win ? 0.92 : 0.25,
+    }));
+    const leg = document.getElementById('mapLegend');
+    if (!rows.length) { leg.innerHTML = ''; return; }
+    leg.innerHTML = `<span>${bdLabel()} rent:</span><span>${fmt$(Math.min(...rows.map(x => x.r)))}</span>
+      <span class="rampbar">${bins.steps.map(s => `<i style="background:${s}"></i>`).join('')}</span>
+      <span>${fmt$(Math.max(...rows.map(x => x.r)))}</span>
+      <span style="margin-left:12px"><i class="chip" style="background:var(--winner)"></i>best under caps</span>`;
+  }
+
   function renderTable(rows) {
     const tb = document.querySelector('#rankTable tbody');
-    tb.innerHTML = [...rows].sort((a, b) => a.cost - b.cost).map((x, i) =>
-      `<tr class="${x.win ? 'win' : ''} ${x.pareto ? 'par' : ''}"><td>${i + 1}</td><td>${x.name}</td><td>${x.boro}</td>
+    const obj = state.objective === 'rent'
+      ? (a, b) => a.r - b.r || a.t - b.t
+      : (a, b) => a.t - b.t || a.r - b.r;
+    const sorted = [...rows].sort((a, b) => (b.feasible - a.feasible) || obj(a, b));
+    tb.innerHTML = sorted.map((x, i) => {
+      const link = seLink(x);
+      return `<tr class="${x.win ? 'win' : ''} ${x.pareto ? 'par' : ''}" ${x.feasible ? '' : 'style="opacity:0.45"'}>
+       <td>${x.feasible ? i + 1 : '·'}</td><td>${x.name}</td><td>${x.boro}</td>
        <td class="num">${Math.round(x.r).toLocaleString()}</td>
-       <td class="num">${x.d.toFixed(1)}</td>
-       <td class="num">${Math.round(x.cost).toLocaleString()}</td></tr>`).join('');
+       <td class="num">${x.t.toFixed(GOOGLE ? 0 : 1)}${x.via === 'walk' ? ' 🚶' : ''}</td>
+       <td class="num">${x.feasible ? 'yes' : 'no'}</td>
+       <td>${link ? `<a href="${link}" target="_blank" rel="noopener">live ↗</a>` : '—'}</td></tr>`;
+    }).join('');
   }
 
-  // ---- stat tile + footer ----
-  function renderTile(rows, win) {
-    document.getElementById('tWin').textContent = `${win.name} (${win.boro})`;
-    document.getElementById('tRent').innerHTML = `${fmt$(win.r)}<small> /mo ${labelBd()}</small>`;
-    document.getElementById('tDist').innerHTML = `${win.d.toFixed(1)}<small> km</small>`;
-    document.getElementById('tCost').innerHTML = `${fmt$(win.cost)}<small> /mo</small>`;
-    document.getElementById('tPareto').textContent =
-      `${rows.filter(x => x.pareto).length} of ${rows.length}`;
+  function renderTile(rows, win, missing, nFeasible) {
+    document.getElementById('tWin').textContent = win ? `${win.name}${win.custom ? '' : ' (' + win.boro + ')'}`
+      : rows.length ? 'nothing fits your caps' : '—';
+    document.getElementById('tRent').innerHTML = win ? `${fmt$(win.r)}<small> /mo ${win.custom ? '' : bdLabel()}</small>` : '—';
+    document.getElementById('tDist').innerHTML = win ? `${win.t.toFixed(GOOGLE ? 0 : 1)}<small> ${metricUnit} avg${win.via ? ' · ' + win.via : ''}</small>` : '—';
+    document.getElementById('tFeas').textContent = rows.length ? `${nFeasible} of ${rows.length}` : '—';
+    document.getElementById('tPareto').textContent = rows.length ? `${rows.filter(x => x.pareto).length} of ${rows.length}` : '—';
+    if (missing && GOOGLE) setStatus(`${missing} candidates awaiting travel times…`);
   }
+
   document.getElementById('srcNote').innerHTML =
-    `rents: <a href="https://streeteasy.com/blog/data-dashboard/">StreetEasy Data Dashboard</a>, ` +
-    `median asking rent, trailing 12-month median per neighborhood, data through <b>${DATA.dataThrough}</b> · ` +
-    `centroids: NYC Open Data NTA 2020 · distance is as-the-crow-flies, not transit time — ` +
-    `a 5 km trip on the G is not a 5 km trip on the 4. neighborhoods without enough listings for a size are omitted.`;
+    `rents: <a href="https://streeteasy.com/blog/data-dashboard/">StreetEasy Data Dashboard</a>, median asking rent ` +
+    `(trailing 12-month median), data through <b>${DATA.dataThrough}</b> · centroids: NYC Open Data NTA 2020 · ` +
+    (GOOGLE
+      ? `travel times &amp; routes: Google Maps — per trip the faster of scheduled transit (next monday 9:00am departure) or walking, cached locally up to 30 days · `
+      : `distances are as-the-crow-flies until a google maps key is added · `) +
+    `listings open live on StreetEasy — this site stores no listing data. neighborhoods without enough listings for a size are omitted.`;
 
   // ---- controls ----
   document.getElementById('bedSeg').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    state.bd = b.dataset.bd;
-    document.querySelectorAll('#bedSeg button').forEach(x =>
-      x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    state.bd = b.dataset.bd; persist();
+    document.querySelectorAll('#bedSeg button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
     render();
   });
-  const lam = document.getElementById('lambda');
-  lam.addEventListener('input', () => {
-    state.lambda = +lam.value;
-    document.getElementById('lambdaOut').textContent = `$${state.lambda} /mo per km`;
+  document.getElementById('objSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.objective = b.dataset.obj; persist();
+    document.querySelectorAll('#objSeg button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
     render();
+  });
+  document.querySelectorAll('#objSeg button').forEach(x =>
+    x.setAttribute('aria-pressed', x.dataset.obj === state.objective ? 'true' : 'false'));
+  const rentEl = document.getElementById('maxRent'), tElc = document.getElementById('maxT');
+  const capLabels = () => {
+    document.getElementById('maxRentOut').textContent =
+      state.maxRent == null ? 'no cap' : fmt$(state.maxRent);
+    document.getElementById('maxTOut').textContent =
+      state.maxT == null ? 'no cap' : `${state.maxT} ${metricUnit}`;
+  };
+  if (state.maxRent != null) rentEl.value = state.maxRent;
+  if (state.maxT != null) tElc.value = state.maxT;
+  capLabels();
+  rentEl.addEventListener('input', () => {
+    state.maxRent = +rentEl.value >= +rentEl.max ? null : +rentEl.value;
+    persist(); capLabels(); render();
+  });
+  tElc.addEventListener('input', () => {
+    state.maxT = +tElc.value >= +tElc.max ? null : +tElc.value;
+    persist(); capLabels(); render();
   });
   document.getElementById('viewSeg').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    document.querySelectorAll('#viewSeg button').forEach(x =>
-      x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    document.querySelectorAll('#viewSeg button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
     document.body.classList.toggle('show-table', b.dataset.view === 'table');
-    if (b.dataset.view === 'viz') map.invalidateSize();
   });
+  document.getElementById('destClick').onclick = () => {
+    state.addingDest = !state.addingDest;
+    document.getElementById('destClick').classList.toggle('arm', state.addingDest);
+  };
+  document.getElementById('lAdd').onclick = async () => {
+    const addr = document.getElementById('lAddr').value.trim();
+    const rent = +document.getElementById('lRent').value;
+    const note = document.getElementById('lNote');
+    if (!addr || !rent) { note.textContent = 'need an address and a rent.'; return; }
+    if (!GOOGLE) { note.textContent = 'needs a google maps key (geocoding).'; return; }
+    try {
+      const g = await new Promise((resolve, reject) => new google.maps.Geocoder().geocode(
+        { address: addr + ', New York, NY' }, (r, s) => s === 'OK' ? resolve(r[0]) : reject(new Error(s))));
+      const custom = {
+        id: 'l' + Date.now(), name: addr.split(',')[0], rent,
+        lat: g.geometry.location.lat(), lng: g.geometry.location.lng(),
+      };
+      state.customs.push(custom);
+      persist();
+      document.getElementById('lAddr').value = ''; document.getElementById('lRent').value = '';
+      note.textContent = 'added ✓ (it participates in the optimization)';
+      // auto-show it: switch to the map view and open its routes immediately
+      document.body.classList.remove('show-table');
+      document.querySelectorAll('#viewSeg button').forEach(x =>
+        x.setAttribute('aria-pressed', x.dataset.view === 'viz' ? 'true' : 'false'));
+      await refresh();
+      const cand = candidates().find(c => c.id === 'c|' + custom.id);
+      if (cand) selectCandidate(cand);
+    } catch (e) { note.textContent = 'could not geocode: ' + e.message; }
+  };
 
-  function render() {
-    const { rows, win } = compute();
+  // ---- render loops ----
+  function render() {                       // cheap: from cache only
+    const { rows, win, missing, nFeasible } = compute();
     renderMap(rows, binner(rows));
     renderScatter(rows);
     renderTable(rows);
-    renderTile(rows, win);
+    renderTile(rows, win, missing, nFeasible);
+    renderDests();
   }
-  render();
+  async function refresh() {                // may hit the network
+    document.body.classList.add('busy');
+    render();
+    try { await ensureMinutes(candidates()); }
+    catch (e) { setStatus('travel-time fetch failed: ' + e.message); }
+    document.body.classList.remove('busy');
+    render();
+  }
+
+  // ---- boot ----
+  if (GOOGLE) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gmapsKey)}&libraries=places&loading=async&callback=__gm`;
+      window.__gm = resolve;
+      s.onerror = () => reject(new Error('google maps failed to load'));
+      document.head.appendChild(s);
+    });
+    initGoogle();
+  } else {
+    initLeaflet();
+    initPhotonSearch();
+  }
+  refresh();
 })();
 </script>
 </body>
