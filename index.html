@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>rent map - jean land</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-blue: #2a78d6;
+    --winner: #eb6834;
+    --dominated: #b9b7af;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-blue: #3987e5;
+      --winner: #d95926;
+      --dominated: #55544f;
+    }
+  }
+  html, body { margin: 0; padding: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 20px 40px; }
+
+  header.top h1 {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, serif;
+    font-weight: normal; font-size: 1.9rem; margin: 0 0 2px;
+  }
+  header.top .sub { color: var(--text-secondary); font-size: 0.95rem; margin: 0 0 4px; }
+  header.top a { color: var(--series-blue); text-decoration: none; }
+  header.top a:hover { text-decoration: underline; }
+
+  /* one filter row above everything it scopes */
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; margin: 14px 0;
+  }
+  .filters .flabel { font-size: 0.78rem; color: var(--muted); display: block; margin-bottom: 3px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; color: var(--text-secondary);
+    padding: 6px 12px; font: inherit; font-size: 0.88rem; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--series-blue); color: #fff; }
+  .lam input[type=range] { width: 220px; accent-color: var(--series-blue); vertical-align: middle; }
+  .lam output { font-variant-numeric: tabular-nums; font-size: 0.9rem; color: var(--text-primary); }
+  .hint { font-size: 0.78rem; color: var(--muted); max-width: 240px; }
+
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 6px 34px; align-items: baseline;
+  }
+  .tile .k { font-size: 0.78rem; color: var(--muted); display: block; }
+  .tile .v { font-size: 1.45rem; }
+  .tile .v.win { color: var(--winner); font-weight: 600; }
+  .tile .v small { font-size: 0.85rem; color: var(--text-secondary); }
+
+  .panels { display: flex; gap: 14px; flex-wrap: wrap; }
+  .panel {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; flex: 1 1 460px; min-width: 320px;
+  }
+  .panel h2 { font-size: 0.95rem; font-weight: 600; margin: 0 0 2px; }
+  .panel .note { font-size: 0.78rem; color: var(--muted); margin: 0 0 8px; }
+  #map { height: 470px; border-radius: 6px; }
+  #scatter { width: 100%; height: auto; display: block; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; font-size: 0.78rem; color: var(--text-secondary); margin-top: 8px; }
+  .chip { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .rampbar { display: inline-flex; height: 10px; border-radius: 3px; overflow: hidden; vertical-align: -1px; margin: 0 5px; }
+  .rampbar i { width: 16px; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 2000; display: none;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    padding: 8px 10px; font-size: 0.82rem; max-width: 240px;
+  }
+  .tooltip .tt-name { font-weight: 600; }
+  .tooltip .tt-row { color: var(--text-secondary); }
+  .tooltip .tt-row b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  table.rank { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.rank th, table.rank td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--grid); }
+  table.rank td.num, table.rank th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.rank th { color: var(--muted); font-weight: 500; font-size: 0.78rem; }
+  table.rank tr.win td { color: var(--winner); font-weight: 600; }
+  table.rank tr.par td:first-child { border-left: 3px solid var(--series-blue); }
+  #tablePanel { display: none; }
+  .viz-root.show-table #tablePanel { display: block; }
+  .viz-root.show-table .panels { display: none; }
+
+  footer.src { margin-top: 18px; font-size: 0.78rem; color: var(--muted); }
+  footer.src a { color: inherit; }
+
+  text.axis { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  text.axis-title { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--text-secondary); }
+  text.dlabel { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--text-primary); paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; }
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <header class="top">
+    <h1>rent vs. commute</h1>
+    <p class="sub">
+      the <a href="https://en.wikipedia.org/wiki/Bid_rent_theory">bid-rent curve</a> of new york city.
+      drag the ✕ pin to where you work. each dot is a neighborhood: median asking rent
+      (<a href="https://streeteasy.com/blog/data-dashboard/">StreetEasy</a>) against straight-line
+      distance to your pin. the cheapest-for-its-distance set — the pareto frontier — is blue;
+      the single best neighborhood for your λ is orange.
+      &nbsp;·&nbsp; <a href="/">⌂ back to jean land</a>
+    </p>
+  </header>
+
+  <div class="filters" role="group" aria-label="filters">
+    <div>
+      <span class="flabel">apartment size</span>
+      <span class="seg" id="bedSeg">
+        <button data-bd="all" aria-pressed="true">all</button>
+        <button data-bd="studio" aria-pressed="false">studio</button>
+        <button data-bd="1br" aria-pressed="false">1 br</button>
+        <button data-bd="2br" aria-pressed="false">2 br</button>
+        <button data-bd="3br" aria-pressed="false">3+ br</button>
+      </span>
+    </div>
+    <div class="lam">
+      <span class="flabel">λ — what a km closer is worth to you</span>
+      <input type="range" id="lambda" min="0" max="800" step="10" value="100"
+             aria-label="dollars per month per kilometer" />
+      <output id="lambdaOut">$100 /mo per km</output>
+    </div>
+    <div>
+      <span class="flabel">view</span>
+      <span class="seg" id="viewSeg">
+        <button data-view="viz" aria-pressed="true">map + chart</button>
+        <button data-view="table" aria-pressed="false">table</button>
+      </span>
+    </div>
+    <div class="hint">minimizing cost(n) = rent(n) + λ·distance(n) over all neighborhoods — exact argmin, no descent required.</div>
+  </div>
+
+  <div class="tile" id="tile">
+    <span><span class="k">optimal neighborhood</span><span class="v win" id="tWin">—</span></span>
+    <span><span class="k">median rent</span><span class="v" id="tRent">—</span></span>
+    <span><span class="k">distance</span><span class="v" id="tDist">—</span></span>
+    <span><span class="k">cost = rent + λ·d</span><span class="v" id="tCost">—</span></span>
+    <span><span class="k">on the pareto frontier</span><span class="v" id="tPareto">—</span></span>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>the map</h2>
+      <p class="note">circles colored by median rent · click anywhere or drag the ✕ to move your commute pin</p>
+      <div id="map"></div>
+      <div class="legend" id="mapLegend"></div>
+    </div>
+    <div class="panel">
+      <h2>rent vs. distance</h2>
+      <p class="note">each dot one neighborhood · hover to identify · blue = pareto frontier, orange = argmin</p>
+      <svg id="scatter" viewBox="0 0 560 470" role="img" aria-label="scatter plot of median rent against distance to pin"></svg>
+      <div class="legend">
+        <span><i class="chip" style="background:var(--winner)"></i>optimal for current λ</span>
+        <span><i class="chip" style="background:var(--series-blue)"></i>pareto frontier</span>
+        <span><i class="chip" style="background:var(--dominated)"></i>dominated (something is both closer &amp; cheaper)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="tablePanel">
+    <h2>ranked by cost = rent + λ·distance</h2>
+    <p class="note">same data as the chart, sortable by eye — blue edge marks the pareto frontier, orange row is the argmin</p>
+    <table class="rank" id="rankTable">
+      <thead><tr><th>#</th><th>neighborhood</th><th>borough</th>
+        <th class="num">rent $/mo</th><th class="num">km</th><th class="num">cost $/mo</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <footer class="src" id="srcNote"></footer>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+(async function () {
+  const DATA = await (await fetch('/rentmap-data.json')).json();
+  const state = { bd: 'all', lambda: 100, pin: { lat: 40.7359, lng: -73.9906 }, hover: null };
+
+  const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+  const darkMode = () => matchMedia('(prefers-color-scheme: dark)').matches;
+  // sequential blue ramp (light: darker = pricier; dark surface: lighter = pricier)
+  const RAMP_LIGHT = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#104281'];
+  const ramp = () => darkMode() ? [...RAMP_LIGHT].reverse() : RAMP_LIGHT;
+
+  const fmt$ = v => '$' + Math.round(v).toLocaleString('en-US');
+  const haversine = (a, b) => {
+    const R = 6371, r = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+    const s = Math.sin(dLat / 2) ** 2 +
+      Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  };
+
+  // ---- model: rows for current bedroom type, pareto flags, argmin ----
+  function compute() {
+    const rows = DATA.neighborhoods
+      .filter(n => n.rent[state.bd])
+      .map((n, i) => ({ ...n, r: n.rent[state.bd], d: haversine(state.pin, n) }));
+    rows.forEach(x => x.cost = x.r + state.lambda * x.d);
+    // pareto frontier: sweep by distance, keep strict running-min rent
+    const byD = [...rows].sort((a, b) => a.d - b.d || a.r - b.r);
+    let best = Infinity;
+    byD.forEach(x => { x.pareto = x.r < best; if (x.r < best) best = x.r; });
+    const win = rows.reduce((m, x) => x.cost < m.cost ? x : m, rows[0]);
+    rows.forEach(x => x.win = x === win);
+    return { rows, win };
+  }
+
+  // quantile bins → ramp colors for the map
+  function binner(rows) {
+    const vals = rows.map(x => x.r).sort((a, b) => a - b);
+    const steps = ramp();
+    const qs = steps.map((_, i) => vals[Math.min(vals.length - 1,
+      Math.floor((i + 1) / steps.length * vals.length))]);
+    return { color: v => steps[qs.findIndex(q => v <= q)], qs, steps };
+  }
+
+  // ---- tooltip (shared by map + scatter) ----
+  const tt = document.getElementById('tooltip');
+  function showTip(x, ev) {
+    tt.innerHTML = `<div class="tt-name">${x.name} · ${x.boro}</div>
+      <div class="tt-row">median ${labelBd()} rent <b>${fmt$(x.r)}</b>/mo</div>
+      <div class="tt-row">distance <b>${x.d.toFixed(1)} km</b></div>
+      <div class="tt-row">cost at λ=$${state.lambda} <b>${fmt$(x.cost)}</b>/mo</div>
+      ${x.win ? '<div class="tt-row"><b style="color:var(--winner)">optimal for this λ</b></div>'
+        : x.pareto ? '<div class="tt-row"><b style="color:var(--series-blue)">on the pareto frontier</b></div>' : ''}`;
+    tt.style.display = 'block';
+    const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
+    tt.style.left = Math.min(innerWidth - w - 8, ev.clientX + pad) + 'px';
+    tt.style.top = (ev.clientY + h + pad > innerHeight ? ev.clientY - h - pad : ev.clientY + pad) + 'px';
+  }
+  const hideTip = () => { tt.style.display = 'none'; };
+  const labelBd = () => ({ all: 'all-size', studio: 'studio', '1br': '1-br', '2br': '2-br', '3br': '3+-br' })[state.bd];
+
+  // ---- map ----
+  const map = L.map('map', { scrollWheelZoom: true }).setView([40.72, -73.94], 11);
+  function tiles() {
+    const kind = darkMode() ? 'dark_all' : 'light_all';
+    return L.tileLayer(`https://{s}.basemaps.cartocdn.com/${kind}/{z}/{x}/{y}{r}.png`, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 18
+    });
+  }
+  let tileLayer = tiles().addTo(map);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    map.removeLayer(tileLayer); tileLayer = tiles().addTo(map); render();
+  });
+
+  const pinIcon = () => L.divIcon({
+    className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+    html: `<div style="font: bold 22px system-ui; line-height:26px; text-align:center; color:${css('--winner')}; text-shadow:0 0 4px ${css('--surface-1')}">✕</div>`
+  });
+  const pin = L.marker(state.pin, { draggable: true, icon: pinIcon(), title: 'your commute destination' }).addTo(map);
+  pin.on('drag dragend', () => { state.pin = pin.getLatLng(); render(); });
+  map.on('click', e => { state.pin = e.latlng; pin.setLatLng(e.latlng); render(); });
+
+  const circleLayer = L.layerGroup().addTo(map);
+  function renderMap(rows, bins) {
+    circleLayer.clearLayers();
+    rows.forEach(x => {
+      const c = L.circleMarker([x.lat, x.lng], {
+        radius: x.win ? 11 : 7,
+        fillColor: x.win ? css('--winner') : bins.color(x.r),
+        fillOpacity: 0.92,
+        color: css('--surface-1'), weight: 2,   // 2px surface ring
+        className: 'hoodCircle'
+      }).addTo(circleLayer);
+      c.on('mousemove', ev => { state.hover = x.name; showTip(x, ev.originalEvent); paintHover(); });
+      c.on('mouseout', () => { state.hover = null; hideTip(); paintHover(); });
+    });
+    const leg = document.getElementById('mapLegend');
+    leg.innerHTML = `<span>median ${labelBd()} rent:</span><span>${fmt$(Math.min(...rows.map(x => x.r)))}</span>
+      <span class="rampbar">${bins.steps.map(s => `<i style="background:${s}"></i>`).join('')}</span>
+      <span>${fmt$(Math.max(...rows.map(x => x.r)))}</span>
+      <span style="margin-left:12px"><i class="chip" style="background:var(--winner)"></i>optimal for λ</span>`;
+  }
+
+  // ---- scatter ----
+  const svg = document.getElementById('scatter');
+  const M = { l: 64, r: 16, t: 12, b: 46 }, W = 560, H = 470;
+  function renderScatter(rows) {
+    const xmax = Math.max(...rows.map(x => x.d)) * 1.04;
+    const ymin = Math.min(...rows.map(x => x.r)), ymax = Math.max(...rows.map(x => x.r));
+    const ypad = (ymax - ymin) * 0.06;
+    const X = d => M.l + d / xmax * (W - M.l - M.r);
+    const Y = r => H - M.b - (r - ymin + ypad) / (ymax - ymin + 2 * ypad) * (H - M.t - M.b);
+    let s = '';
+    // hairline grid + axes
+    const xticks = 5, yticks = 5;
+    for (let i = 0; i <= xticks; i++) {
+      const v = xmax / xticks * i, px = X(v);
+      s += `<line x1="${px}" y1="${M.t}" x2="${px}" y2="${H - M.b}" stroke="var(--grid)" stroke-width="1"/>`;
+      s += `<text class="axis" x="${px}" y="${H - M.b + 16}" text-anchor="middle">${v.toFixed(0)}</text>`;
+    }
+    for (let i = 0; i <= yticks; i++) {
+      const v = ymin - ypad + (ymax - ymin + 2 * ypad) / yticks * i, py = Y(v);
+      s += `<line x1="${M.l}" y1="${py}" x2="${W - M.r}" y2="${py}" stroke="var(--grid)" stroke-width="1"/>`;
+      s += `<text class="axis" x="${M.l - 8}" y="${py + 4}" text-anchor="end">${fmt$(v)}</text>`;
+    }
+    s += `<line x1="${M.l}" y1="${H - M.b}" x2="${W - M.r}" y2="${H - M.b}" stroke="var(--baseline)" stroke-width="1"/>`;
+    s += `<text class="axis-title" x="${(M.l + W - M.r) / 2}" y="${H - 8}" text-anchor="middle">straight-line distance to your pin (km)</text>`;
+    s += `<text class="axis-title" transform="rotate(-90 14 ${(M.t + H - M.b) / 2})" x="14" y="${(M.t + H - M.b) / 2}" text-anchor="middle">median asking rent ($/mo)</text>`;
+    // pareto step line
+    const front = rows.filter(x => x.pareto).sort((a, b) => a.d - b.d);
+    if (front.length > 1) {
+      let p = `M ${X(front[0].d)} ${Y(front[0].r)}`;
+      for (let i = 1; i < front.length; i++)
+        p += ` L ${X(front[i].d)} ${Y(front[i - 1].r)} L ${X(front[i].d)} ${Y(front[i].r)}`;
+      s += `<path d="${p}" fill="none" stroke="var(--series-blue)" stroke-width="2" opacity="0.45"/>`;
+    }
+    // dots: dominated under frontier under winner; big invisible hit targets
+    const order = [...rows].sort((a, b) => (a.win - b.win) || (a.pareto - b.pareto));
+    order.forEach(x => {
+      const hov = state.hover === x.name;
+      const fill = x.win ? 'var(--winner)' : x.pareto ? 'var(--series-blue)' : 'var(--dominated)';
+      const rr = x.win ? 8 : hov ? 7 : 4.5;
+      s += `<circle data-n="${x.name.replace(/"/g, '&quot;')}" cx="${X(x.d)}" cy="${Y(x.r)}" r="${rr}"
+              fill="${fill}" stroke="var(--surface-1)" stroke-width="2"/>`;
+      s += `<circle data-hit="${x.name.replace(/"/g, '&quot;')}" cx="${X(x.d)}" cy="${Y(x.r)}" r="12" fill="transparent"/>`;
+    });
+    // selective direct labels: winner + frontier endpoints
+    const lbl = new Set([rows.find(x => x.win), front[0], front[front.length - 1]].filter(Boolean));
+    lbl.forEach(x => {
+      const anchor = X(x.d) > W - 120 ? 'end' : 'start';
+      const dx = anchor === 'end' ? -10 : 10;
+      s += `<text class="dlabel" x="${X(x.d) + dx}" y="${Y(x.r) + 4}" text-anchor="${anchor}">${x.name}</text>`;
+    });
+    svg.innerHTML = s;
+    svg.querySelectorAll('[data-hit]').forEach(el => {
+      const x = rows.find(r => r.name === el.dataset.hit);
+      el.addEventListener('mousemove', ev => { state.hover = x.name; showTip(x, ev); paintHover(); });
+      el.addEventListener('mouseout', () => { state.hover = null; hideTip(); paintHover(); });
+    });
+  }
+  function paintHover() {
+    svg.querySelectorAll('circle[data-n]').forEach(el => {
+      const hov = el.dataset.n === state.hover;
+      if (!el.dataset.baseR) el.dataset.baseR = el.getAttribute('r');
+      el.setAttribute('r', hov ? Math.max(7, +el.dataset.baseR) : el.dataset.baseR);
+    });
+  }
+
+  // ---- table view ----
+  function renderTable(rows) {
+    const tb = document.querySelector('#rankTable tbody');
+    tb.innerHTML = [...rows].sort((a, b) => a.cost - b.cost).map((x, i) =>
+      `<tr class="${x.win ? 'win' : ''} ${x.pareto ? 'par' : ''}"><td>${i + 1}</td><td>${x.name}</td><td>${x.boro}</td>
+       <td class="num">${Math.round(x.r).toLocaleString()}</td>
+       <td class="num">${x.d.toFixed(1)}</td>
+       <td class="num">${Math.round(x.cost).toLocaleString()}</td></tr>`).join('');
+  }
+
+  // ---- stat tile + footer ----
+  function renderTile(rows, win) {
+    document.getElementById('tWin').textContent = `${win.name} (${win.boro})`;
+    document.getElementById('tRent').innerHTML = `${fmt$(win.r)}<small> /mo ${labelBd()}</small>`;
+    document.getElementById('tDist').innerHTML = `${win.d.toFixed(1)}<small> km</small>`;
+    document.getElementById('tCost').innerHTML = `${fmt$(win.cost)}<small> /mo</small>`;
+    document.getElementById('tPareto').textContent =
+      `${rows.filter(x => x.pareto).length} of ${rows.length}`;
+  }
+  document.getElementById('srcNote').innerHTML =
+    `rents: <a href="https://streeteasy.com/blog/data-dashboard/">StreetEasy Data Dashboard</a>, ` +
+    `median asking rent, trailing 12-month median per neighborhood, data through <b>${DATA.dataThrough}</b> · ` +
+    `centroids: NYC Open Data NTA 2020 · distance is as-the-crow-flies, not transit time — ` +
+    `a 5 km trip on the G is not a 5 km trip on the 4. neighborhoods without enough listings for a size are omitted.`;
+
+  // ---- controls ----
+  document.getElementById('bedSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.bd = b.dataset.bd;
+    document.querySelectorAll('#bedSeg button').forEach(x =>
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    render();
+  });
+  const lam = document.getElementById('lambda');
+  lam.addEventListener('input', () => {
+    state.lambda = +lam.value;
+    document.getElementById('lambdaOut').textContent = `$${state.lambda} /mo per km`;
+    render();
+  });
+  document.getElementById('viewSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#viewSeg button').forEach(x =>
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    document.body.classList.toggle('show-table', b.dataset.view === 'table');
+    if (b.dataset.view === 'viz') map.invalidateSize();
+  });
+
+  function render() {
+    const { rows, win } = compute();
+    renderMap(rows, binner(rows));
+    renderScatter(rows);
+    renderTable(rows);
+    renderTile(rows, win);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
