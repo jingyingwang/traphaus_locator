@@ -190,10 +190,11 @@
   </header>
 
   <div class="banner" id="keyBanner" style="display:none">
-    ⚠ running in <b>straight-line fallback</b> (distances, not minutes). paste a
+    running on the <b>built-in subway engine</b> (MTA weekday schedules: ride times, waits = half
+    headway, transfers; walk legs straight-line at 1.4 m/s). optionally paste a
     <a href="https://developers.google.com/maps/documentation/javascript/get-api-key">Google Maps API key</a>
-    (enable Maps JavaScript, Distance Matrix, Directions, Places, Geocoding; restrict by referrer)
-    to get real transit / walking / cycling minutes and exact routes:
+    (Maps JavaScript, Distance Matrix, Directions, Places, Geocoding; restrict by referrer)
+    for live-scheduled routing, buses and bikes:
     <input id="keyInput" type="text" placeholder="AIza…" autocomplete="off" />
     <button id="keySave">use key</button>
   </div>
@@ -239,13 +240,6 @@
         <button data-view="table" aria-pressed="false">table</button>
       </span>
     </div>
-    <div class="listing-form" style="max-width:250px">
-      <span class="flabel">compare a specific listing (paste from StreetEasy)</span>
-      <input id="lAddr" type="text" placeholder="address" size="20" style="margin-bottom:4px" />
-      <input id="lRent" type="number" placeholder="$/mo" size="8" min="0" />
-      <button id="lAdd">add</button>
-      <div class="flabel" id="lNote" style="margin-top:3px"></div>
-    </div>
   </div>
 
   <div class="tile" id="tile">
@@ -273,7 +267,7 @@
         <span><i class="chip" style="background:var(--winner)"></i>best under your caps</span>
         <span><i class="chip" style="background:var(--series-blue)"></i>pareto frontier</span>
         <span><i class="chip" style="background:var(--dominated)"></i>dominated</span>
-        <span><i class="chip diamond" style="background:var(--series-blue)"></i>your pasted listings</span>
+        <span>faded = outside your caps</span>
       </div>
     </div>
   </div>
@@ -303,7 +297,10 @@
   const gmapsKey = localStorage.getItem(LS.key) || GMAPS_KEY_DEFAULT;
   const GOOGLE = !!gmapsKey;
 
-  const DATA = await (await fetch('./rentmap-data.json')).json();
+  const [DATA, SUBWAY] = await Promise.all([
+    (await fetch('./rentmap-data.json')).json(),
+    (await fetch('./subway-graph.json')).json(),
+  ]);
 
   const saved = JSON.parse(localStorage.getItem(LS.state) || 'null');
   const state = Object.assign({
@@ -323,14 +320,8 @@
   const RAMP_LIGHT = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#104281'];
   const ramp = () => darkMode() ? [...RAMP_LIGHT].reverse() : RAMP_LIGHT;
   const fmt$ = v => '$' + Math.round(v).toLocaleString('en-US');
-  const metricUnit = GOOGLE ? 'min' : 'km';
-  document.querySelectorAll('.metricUnit').forEach(e => e.textContent = GOOGLE ? 'minute' : 'km');
-  document.getElementById('thMetric').textContent = metricUnit;
-  if (!GOOGLE) {
-    document.getElementById('keyBanner').style.display = 'block';
-    const tEl = document.getElementById('maxT');
-    tEl.min = 1; tEl.max = 35; tEl.step = 1; tEl.value = 35;   // km in fallback
-  }
+  const metricUnit = 'min';
+  if (!GOOGLE) document.getElementById('keyBanner').style.display = 'block';
   document.getElementById('keySave').onclick = () => {
     const v = document.getElementById('keyInput').value.trim();
     if (v) { localStorage.setItem(LS.key, v); location.reload(); }
@@ -348,6 +339,132 @@
     d.setHours(9, 0, 0, 0);
     return d;
   };
+
+  // ============ built-in subway engine (MTA GTFS graph, no API needed) ============
+  const WALK_MIN_PER_KM = 1000 / (1.4 * 60);   // 1.4 m/s standard walking speed
+  const ENTRY_RADIUS_KM = 2.0;                 // farther than this, walking to another station rarely wins
+  const subwayEngine = (() => {
+    const g = SUBWAY;
+    const stById = new Map(g.stations.map(s => [s.id, s]));
+    // nodes: station ids and `${sid}|${rid}`; adjacency list
+    const adj = new Map();
+    const edge = (a, b, m, kind, r) => {
+      if (!adj.has(a)) adj.set(a, []);
+      adj.get(a).push({ to: b, m, kind, r });
+    };
+    for (const s of g.stations) for (const r of s.routes) {
+      edge(s.id, `${s.id}|${r}`, (g.headwayMin[r] || 10) / 2, 'board', r);
+      edge(`${s.id}|${r}`, s.id, 0, 'alight', r);
+    }
+    for (const e of g.edges) edge(`${e.a}|${e.r}`, `${e.b}|${e.r}`, e.m, 'ride', e.r);
+    for (const t of g.transfers) { edge(t.a, t.b, t.m, 'xfer'); edge(t.b, t.a, t.m, 'xfer'); }
+    // reversed adjacency for destination-side sweeps
+    const radj = new Map();
+    for (const [a, list] of adj) for (const e of list) {
+      if (!radj.has(e.to)) radj.set(e.to, []);
+      radj.get(e.to).push({ to: a, m: e.m, kind: e.kind, r: e.r });
+    }
+
+    function dijkstra(seeds, graph, withParents) {
+      const dist = new Map(), parent = withParents ? new Map() : null;
+      const heap = [];   // [d, node]
+      const push = (d, n) => { heap.push([d, n]); let i = heap.length - 1;
+        while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break;
+          [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+      const pop = () => { const top = heap[0], last = heap.pop();
+        if (heap.length) { heap[0] = last; let i = 0;
+          for (;;) { const l = 2 * i + 1, rr = l + 1; let m = i;
+            if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+            if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr;
+            if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } }
+        return top; };
+      for (const [n, d] of seeds) { dist.set(n, d); push(d, n); }
+      while (heap.length) {
+        const [d, n] = pop();
+        if (d > (dist.get(n) ?? Infinity)) continue;
+        for (const e of graph.get(n) || []) {
+          const nd = d + e.m;
+          if (nd < (dist.get(e.to) ?? Infinity)) {
+            dist.set(e.to, nd);
+            if (parent) parent.set(e.to, { from: n, e });
+            push(nd, e.to);
+          }
+        }
+      }
+      return { dist, parent };
+    }
+
+    const nearStations = p => g.stations
+      .map(s => ({ s, km: haversineKm(p, s) }))
+      .filter(x => x.km <= ENTRY_RADIUS_KM);
+
+    // minutes from every station to dest (walk egress included), one sweep per dest
+    const revCache = new Map();
+    function reverse(dest) {
+      const k = `${dest.lat.toFixed(5)},${dest.lng.toFixed(5)}`;
+      if (revCache.has(k)) return revCache.get(k);
+      const seeds = nearStations(dest).map(x => [x.s.id, x.km * WALK_MIN_PER_KM]);
+      const { dist } = dijkstra(seeds, radj, false);
+      revCache.set(k, dist);
+      return dist;
+    }
+
+    function minutes(origin, dest) {
+      const walk = haversineKm(origin, dest) * WALK_MIN_PER_KM;
+      const rev = reverse(dest);
+      let best = walk, via = 'walk';
+      for (const { s, km } of nearStations(origin)) {
+        const t = km * WALK_MIN_PER_KM + (rev.get(s.id) ?? Infinity);
+        if (t < best) { best = t; via = 'transit'; }
+      }
+      return { m: best, via };
+    }
+
+    // full path for drawing: forward dijkstra with parents
+    function route(origin, dest) {
+      const entries = nearStations(origin);
+      const seeds = entries.map(x => [x.s.id, x.km * WALK_MIN_PER_KM]);
+      const walkDirect = haversineKm(origin, dest) * WALK_MIN_PER_KM;
+      if (!seeds.length) return { m: walkDirect, legs: [{ kind: 'walk', m: walkDirect, from: origin, to: dest }] };
+      const { dist, parent } = dijkstra(seeds, adj, true);
+      let exit = null, best = walkDirect;
+      for (const { s, km } of nearStations(dest)) {
+        const t = (dist.get(s.id) ?? Infinity) + km * WALK_MIN_PER_KM;
+        if (t < best) { best = t; exit = s; }
+      }
+      if (!exit) return { m: walkDirect, legs: [{ kind: 'walk', m: walkDirect, from: origin, to: dest }] };
+      // walk back the parent chain from exit station
+      const chain = [];
+      let n = exit.id;
+      while (parent.has(n)) { const p = parent.get(n); chain.push({ n, ...p }); n = p.from; }
+      chain.reverse();
+      const entrySt = stById.get(n);
+      const legs = [{ kind: 'walk', m: haversineKm(origin, entrySt) * WALK_MIN_PER_KM, from: origin, to: entrySt }];
+      let ride = null;
+      const closeRide = () => { if (ride) { legs.push(ride); ride = null; } };
+      for (const step of chain) {
+        const { e } = step;
+        if (e.kind === 'board') {
+          closeRide();
+          legs.push({ kind: 'wait', m: e.m, r: e.r });
+          ride = { kind: 'ride', r: e.r, m: 0, stations: [stById.get(chainStation(step))] };
+        } else if (e.kind === 'ride') {
+          if (ride) { ride.m += e.m; ride.stations.push(stById.get(step.n.split('|')[0])); }
+        } else if (e.kind === 'xfer') {
+          closeRide();
+          legs.push({ kind: 'xferWalk', m: e.m, from: stById.get(step.from), to: stById.get(step.n) });
+        } else if (e.kind === 'alight') {
+          closeRide();
+        }
+      }
+      closeRide();
+      legs.push({ kind: 'walk', m: haversineKm(exit, dest) * WALK_MIN_PER_KM, from: exit, to: dest });
+      return { m: best, legs };
+      function chainStation(step) { return step.from.includes('|') ? step.from.split('|')[0] : step.from; }
+    }
+
+    return { minutes, reverse, route, routes: g.routes, stById };
+  })();
 
   // ---- candidates: neighborhoods + pasted listings ----
   function candidates() {
@@ -439,14 +556,15 @@
           if (p === undefined || p === null) { ok = false; break; }
           acc += (+d.w || 0) * p.m; modes.push(p.mode);
         } else {
-          acc += (+d.w || 0) * haversineKm(o, d);
+          const p = subwayEngine.minutes(o, d);
+          acc += (+d.w || 0) * p.m; modes.push(p.via === 'walk' ? 'walking' : 'transit');
         }
       }
       if (!ok) { missing++; continue; }
       const t = acc / W;
       rows.push({
         ...o, t,
-        via: modes.length ? (modes.every(m => m === 'walking') ? 'walk' : 'transit') : null,
+        via: modes.every(m => m === 'walking') ? 'walk' : 'transit',
         feasible: (state.maxRent == null || o.r <= state.maxRent) && (state.maxT == null || t <= state.maxT),
       });
     }
@@ -479,7 +597,7 @@
   function showTip(x, ev) {
     tt.innerHTML = `<div class="tt-name">${x.name}${x.custom ? ' (your listing)' : ' · ' + x.boro}</div>
       <div class="tt-row">${x.custom ? 'asking' : `median ${bdLabel()}`} rent <b>${fmt$(x.r)}</b>/mo</div>
-      <div class="tt-row">avg commute <b>${x.t.toFixed(GOOGLE ? 0 : 1)} ${metricUnit}</b>${x.via ? ` <small>via ${x.via}</small>` : ''}</div>
+      <div class="tt-row">avg commute <b>${x.t.toFixed(0)} ${metricUnit}</b>${x.via ? ` <small>via ${x.via}</small>` : ''}</div>
       ${x.win ? '<div class="tt-row"><b style="color:var(--winner)">best under your caps</b></div>'
         : !x.feasible ? '<div class="tt-row">outside your caps</div>'
         : x.pareto ? '<div class="tt-row"><b style="color:var(--series-blue)">on the pareto frontier</b></div>' : ''}
@@ -535,11 +653,29 @@
       clearRoutes: () => routeLayer.clearLayers(),
       async drawRoutes(x) {
         routeLayer.clearLayers();
-        const html = state.dests.map(d => {
-          L.polyline([[x.lat, x.lng], [d.lat, d.lng]], { color: css('--series-blue'), weight: 2, dashArray: '6 6' }).addTo(routeLayer);
-          return `<div class="route-leg">→ ${d.name}: <b>${haversineKm(x, d).toFixed(1)} km</b> straight-line</div>`;
-        }).join('');
-        return html + `<div class="route-leg">add a google maps key for real routes.</div>`;
+        const parts = [];
+        for (const d of state.dests) {
+          const { m, legs } = subwayEngine.route(x, d);
+          const bits = [];
+          for (const leg of legs) {
+            if (leg.kind === 'ride') {
+              const rt = subwayEngine.routes[leg.r] || {};
+              L.polyline(leg.stations.map(s => [s.lat, s.lng]),
+                { color: rt.color || css('--series-blue'), weight: 4, opacity: 0.9 }).addTo(routeLayer);
+              bits.push(`<span class="lpill" style="background:${rt.color || '#555'};color:${rt.textColor || '#fff'}">${rt.name || leg.r}</span> ${Math.round(leg.m)}m`);
+            } else if (leg.kind === 'wait') {
+              bits.push(`wait ~${leg.m.toFixed(0)}m`);
+            } else if (leg.kind === 'walk' || leg.kind === 'xferWalk') {
+              if (leg.from && leg.to)
+                L.polyline([[leg.from.lat, leg.from.lng], [leg.to.lat, leg.to.lng]],
+                  { color: css('--muted'), weight: 3, dashArray: '4 7', opacity: 0.8 }).addTo(routeLayer);
+              if (leg.m >= 1.5) bits.push(`${leg.kind === 'xferWalk' ? 'transfer' : 'walk'} ${Math.round(leg.m)}m`);
+            }
+          }
+          parts.push(`<div class="route-leg">→ ${d.name}: <b>${Math.round(m)} min</b> · ${bits.join(' · ')}</div>`);
+        }
+        return parts.join('') +
+          `<div class="route-leg" style="opacity:0.7">subway engine: MTA weekday schedule medians; walks straight-line at 1.4 m/s</div>`;
       },
     };
   }
@@ -701,7 +837,8 @@
     }
   }
 
-  async function selectCandidate(x) {
+  async function selectCandidate(x, auto) {
+    if (!auto) state.autoSelected = false;
     state.selected = x.id;
     const rp = document.getElementById('routePanel');
     rp.className = 'route-panel on';
@@ -773,7 +910,7 @@
       s += `<line x1="${M.l}" y1="${py}" x2="${W - M.r}" y2="${py}" stroke="var(--winner)" stroke-width="1" opacity="0.6"/>`;
       s += `<text class="axis" x="${W - M.r - 4}" y="${py - 4}" text-anchor="end" fill="var(--winner)">cap</text>`;
     }
-    const xlab = GOOGLE ? 'trip-weighted one-way minutes (fastest of transit/walk, next mon 9am)' : 'trip-weighted straight-line distance (km)';
+    const xlab = GOOGLE ? 'trip-weighted one-way minutes (fastest of transit/walk, next mon 9am)' : 'trip-weighted one-way minutes (subway schedule + walk)';
     s += `<text class="axis-title" x="${(M.l + W - M.r) / 2}" y="${H - 8}" text-anchor="middle">${xlab}</text>`;
     s += `<text class="axis-title" transform="rotate(-90 14 ${(M.t + H - M.b) / 2})" x="14" y="${(M.t + H - M.b) / 2}" text-anchor="middle">asking rent ($/mo)</text>`;
     const front = rows.filter(x => x.pareto).sort((a, b) => a.t - b.t);
@@ -839,7 +976,7 @@
       return `<tr class="${x.win ? 'win' : ''} ${x.pareto ? 'par' : ''}" ${x.feasible ? '' : 'style="opacity:0.45"'}>
        <td>${x.feasible ? i + 1 : '·'}</td><td>${x.name}</td><td>${x.boro}</td>
        <td class="num">${Math.round(x.r).toLocaleString()}</td>
-       <td class="num">${x.t.toFixed(GOOGLE ? 0 : 1)}${x.via === 'walk' ? ' 🚶' : ''}</td>
+       <td class="num">${x.t.toFixed(0)}${x.via === 'walk' ? ' 🚶' : ''}</td>
        <td class="num">${x.feasible ? 'yes' : 'no'}</td>
        <td>${link ? `<a href="${link}" target="_blank" rel="noopener">live ↗</a>` : '—'}</td></tr>`;
     }).join('');
@@ -849,7 +986,7 @@
     document.getElementById('tWin').textContent = win ? `${win.name}${win.custom ? '' : ' (' + win.boro + ')'}`
       : rows.length ? 'nothing fits your caps' : '—';
     document.getElementById('tRent').innerHTML = win ? `${fmt$(win.r)}<small> /mo ${win.custom ? '' : bdLabel()}</small>` : '—';
-    document.getElementById('tDist').innerHTML = win ? `${win.t.toFixed(GOOGLE ? 0 : 1)}<small> ${metricUnit} avg${win.via ? ' · ' + win.via : ''}</small>` : '—';
+    document.getElementById('tDist').innerHTML = win ? `${win.t.toFixed(0)}<small> ${metricUnit} avg${win.via ? ' · ' + win.via : ''}</small>` : '—';
     document.getElementById('tFeas').textContent = rows.length ? `${nFeasible} of ${rows.length}` : '—';
     document.getElementById('tPareto').textContent = rows.length ? `${rows.filter(x => x.pareto).length} of ${rows.length}` : '—';
     if (missing && GOOGLE) setStatus(`${missing} candidates awaiting travel times…`);
@@ -860,7 +997,7 @@
     `(trailing 12-month median), data through <b>${DATA.dataThrough}</b> · centroids: NYC Open Data NTA 2020 · ` +
     (GOOGLE
       ? `travel times &amp; routes: Google Maps — per trip the faster of scheduled transit (next monday 9:00am departure) or walking, cached locally up to 30 days · `
-      : `distances are as-the-crow-flies until a google maps key is added · `) +
+      : `travel times &amp; routes: built-in subway engine — MTA weekday schedule medians, wait = half headway, transfers from GTFS, walk legs straight-line at 1.4 m/s · `) +
     `listings open live on StreetEasy — this site stores no listing data. neighborhoods without enough listings for a size are omitted.`;
 
   // ---- controls ----
@@ -905,34 +1042,9 @@
     state.addingDest = !state.addingDest;
     document.getElementById('destClick').classList.toggle('arm', state.addingDest);
   };
-  document.getElementById('lAdd').onclick = async () => {
-    const addr = document.getElementById('lAddr').value.trim();
-    const rent = +document.getElementById('lRent').value;
-    const note = document.getElementById('lNote');
-    if (!addr || !rent) { note.textContent = 'need an address and a rent.'; return; }
-    if (!GOOGLE) { note.textContent = 'needs a google maps key (geocoding).'; return; }
-    try {
-      const g = await new Promise((resolve, reject) => new google.maps.Geocoder().geocode(
-        { address: addr + ', New York, NY' }, (r, s) => s === 'OK' ? resolve(r[0]) : reject(new Error(s))));
-      const custom = {
-        id: 'l' + Date.now(), name: addr.split(',')[0], rent,
-        lat: g.geometry.location.lat(), lng: g.geometry.location.lng(),
-      };
-      state.customs.push(custom);
-      persist();
-      document.getElementById('lAddr').value = ''; document.getElementById('lRent').value = '';
-      note.textContent = 'added ✓ (it participates in the optimization)';
-      // auto-show it: switch to the map view and open its routes immediately
-      document.body.classList.remove('show-table');
-      document.querySelectorAll('#viewSeg button').forEach(x =>
-        x.setAttribute('aria-pressed', x.dataset.view === 'viz' ? 'true' : 'false'));
-      await refresh();
-      const cand = candidates().find(c => c.id === 'c|' + custom.id);
-      if (cand) selectCandidate(cand);
-    } catch (e) { note.textContent = 'could not geocode: ' + e.message; }
-  };
 
   // ---- render loops ----
+  let lastAutoWin = null;
   function render() {                       // cheap: from cache only
     const { rows, win, missing, nFeasible } = compute();
     renderMap(rows, binner(rows));
@@ -940,6 +1052,12 @@
     renderTable(rows);
     renderTile(rows, win, missing, nFeasible);
     renderDests();
+    // keyless engine is local & free: keep the winner's routes drawn automatically
+    if (!GOOGLE && win && (state.selected == null || state.autoSelected) && lastAutoWin !== win.id) {
+      lastAutoWin = win.id;
+      state.autoSelected = true;
+      selectCandidate(win, true);
+    }
   }
   async function refresh() {                // may hit the network
     document.body.classList.add('busy');
